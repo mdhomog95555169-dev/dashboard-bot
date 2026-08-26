@@ -1,28 +1,30 @@
-const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder, ComponentType } = require('discord.js');
+const fs = require('fs');
+
+const helpCode = `const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder, ComponentType } = require('discord.js');
 
 function buildMainEmbed(client) {
   return new EmbedBuilder()
     .setTitle('⚡ OS System — Control Center')
     .setDescription(
-      '> **مرحباً بك في لوحة تحكم OS.**\n' +
-      '> اختر القسم المطلوب من القائمة بالأسفل.\n\n' +
-      '✈️ ` /ban `\n' +
-      '> حظر عضو من السيرفر\n\n' +
-      '🔓 ` /unban `\n' +
-      '> فك الحظر بواسطة ID\n\n' +
-      '🧹 ` /clear `\n' +
-      '> مسح عدد من الرسائل\n\n' +
-      '🔒 ` /lock `\n' +
-      '> قفل القناة الحالية\n\n' +
-      '🔓 ` /unlock `\n' +
-      '> فتح القناة الحالية\n\n' +
-      '🔇 ` /mute `\n' +
-      '> إعطاء ميوت للمستخدم\n\n' +
-      '🔊 ` /unmute `\n' +
-      '> فك الميوت عن المستخدم\n\n' +
-      '🏷️ ` /setnick `\n' +
-      '> تغيير لقب المستخدم\n\n' +
-      '⚙️ ` /help `\n' +
+      '> **مرحباً بك في لوحة تحكم OS.**\\n' +
+      '> اختر القسم المطلوب من القائمة بالأسفل.\\n\\n' +
+      '✈️ \` /ban \`\\n' +
+      '> حظر عضو من السيرفر\\n\\n' +
+      '🔓 \` /unban \`\\n' +
+      '> فك الحظر بواسطة ID\\n\\n' +
+      '🧹 \` /clear \`\\n' +
+      '> مسح عدد من الرسائل\\n\\n' +
+      '🔒 \` /lock \`\\n' +
+      '> قفل القناة الحالية\\n\\n' +
+      '🔓 \` /unlock \`\\n' +
+      '> فتح القناة الحالية\\n\\n' +
+      '🔇 \` /mute \`\\n' +
+      '> إعطاء ميوت للمستخدم\\n\\n' +
+      '🔊 \` /unmute \`\\n' +
+      '> فك الميوت عن المستخدم\\n\\n' +
+      '🏷️ \` /setnick \`\\n' +
+      '> تغيير لقب المستخدم\\n\\n' +
+      '⚙️ \` /help \`\\n' +
       '> عرض قائمة المساعدة'
     )
     .setColor('#2b2d31')
@@ -74,19 +76,19 @@ module.exports = {
 
       if (selected === 'mod_category') {
         newEmbed.setTitle('🛡️ أوامر الإدارة').setDescription(
-          '✈️ ` /ban `\n> حظر عضو من السيرفر\n\n' +
-          '🔓 ` /unban `\n> فك الحظر بواسطة ID\n\n' +
-          '🧹 ` /clear `\n> مسح عدد من الرسائل\n\n' +
-          '🔒 ` /lock `\n> قفل القناة الحالية\n\n' +
-          '🔓 ` /unlock `\n> فتح القناة الحالية\n\n' +
-          '🔇 ` /mute `\n> إعطاء ميوت للمستخدم\n\n' +
-          '🔊 ` /unmute `\n> فك الميوت عن المستخدم\n\n' +
-          '🏷️ ` /setnick `\n> تغيير لقب المستخدم'
+          '✈️ \` /ban \`\\n> حظر عضو من السيرفر\\n\\n' +
+          '🔓 \` /unban \`\\n> فك الحظر بواسطة ID\\n\\n' +
+          '🧹 \` /clear \`\\n> مسح عدد من الرسائل\\n\\n' +
+          '🔒 \` /lock \`\\n> قفل القناة الحالية\\n\\n' +
+          '🔓 \` /unlock \`\\n> فتح القناة الحالية\\n\\n' +
+          '🔇 \` /mute \`\\n> إعطاء ميوت للمستخدم\\n\\n' +
+          '🔊 \` /unmute \`\\n> فك الميوت عن المستخدم\\n\\n' +
+          '🏷️ \` /setnick \`\\n> تغيير لقب المستخدم'
         );
       } else if (selected === 'general_category') {
         newEmbed.setTitle('🌐 الأوامر العامة').setDescription(
-          '⚙️ ` /help `\n> عرض قائمة المساعدة\n\n' +
-          '📊 ` /info `\n> عرض إحصائيات السيرفر'
+          '⚙️ \` /help \`\\n> عرض قائمة المساعدة\\n\\n' +
+          '📊 \` /info \`\\n> عرض إحصائيات السيرفر'
         );
       }
 
@@ -99,3 +101,10 @@ module.exports = {
     });
   }
 };
+`;
+
+fs.writeFileSync('help.js', helpCode);
+if (fs.existsSync('src/commands')) fs.writeFileSync('src/commands/help.js', helpCode);
+if (fs.existsSync('commands')) fs.writeFileSync('commands/help.js', helpCode);
+
+console.log('✅ Updated help command with anti-duplicate collectors.');
