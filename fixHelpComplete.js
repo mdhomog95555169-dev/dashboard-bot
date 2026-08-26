@@ -1,10 +1,12 @@
-const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder, ComponentType } = require('discord.js');
+const fs = require('fs');
+
+const helpCode = `const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder, ComponentType } = require('discord.js');
 
 // 1. القائمة الرئيسية الشاملة
 function buildMainEmbed() {
   return new EmbedBuilder()
     .setTitle('⚡ OS System — Control Center')
-    .setDescription('> **مرحباً بك في لوحة تحكم OS.**\n> اختر القسم المطلوب من القائمة بالأسفل لفرز الأوامر.')
+    .setDescription('> **مرحباً بك في لوحة تحكم OS.**\\n> اختر القسم المطلوب من القائمة بالأسفل لفرز الأوامر.')
     .addFields(
       { name: '✈️ ban', value: 'حظر عضو من السيرفر', inline: true },
       { name: '🔓 unban', value: 'فك الحظر بواسطة ID', inline: true },
@@ -82,3 +84,11 @@ module.exports = {
     });
   }
 };
+`;
+
+// تحديث ملف help.js في جميع المسارات المحتملة
+fs.writeFileSync('help.js', helpCode);
+if (fs.existsSync('src/commands')) fs.writeFileSync('src/commands/help.js', helpCode);
+if (fs.existsSync('commands')) fs.writeFileSync('commands/help.js', helpCode);
+
+console.log('✅ Updated help.js with all moderation & general commands in dropdown menus.');
