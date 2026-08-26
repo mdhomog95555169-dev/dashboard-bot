@@ -1,6 +1,16 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Partials, REST, Routes, SlashCommandBuilder } = require('discord.js');
+const http = require('http');
+const { Client, GatewayIntentBits, Partials, REST, Routes, SlashCommandBuilder, Events } = require('discord.js');
 const handler = require('./commandsHandler.js');
+
+// سيرفر صغير لفتح Port وإصلاح تنبيه Render Port Binding
+const PORT = process.env.PORT || 3000;
+http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('OS System Bot is Running Online!');
+}).listen(PORT, () => {
+  console.log(`🌐 Web Port binding active on port ${PORT}`);
+});
 
 const client = new Client({
   intents: [
@@ -14,7 +24,6 @@ const client = new Client({
 
 const PREFIX = '-';
 
-// تسجل الأوامر في Slash Commands
 async function registerSlashCommands() {
   const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN || process.env.BOT_TOKEN);
   const slashData = handler.commandsList.map(cmd => 
@@ -33,19 +42,17 @@ async function registerSlashCommands() {
   }
 }
 
-client.once('ready', async () => {
+client.once(Events.ClientReady, async () => {
   console.log(`✅ Bot ready as ${client.user.tag}`);
   await registerSlashCommands();
 });
 
-// التعامل مع Slash Commands
-client.on('interactionCreate', async (interaction) => {
+client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
   await handler.runCommand(interaction.commandName, interaction, []);
 });
 
-// التعامل مع Prefix و Prefix-less
-client.on('messageCreate', async (message) => {
+client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot || !message.guild) return;
 
   const content = message.content.trim();
@@ -62,7 +69,6 @@ client.on('messageCreate', async (message) => {
     args = split.slice(1);
   }
 
-  // التأكد من أن الأمر موجود في قائمة الأوامر المعتمدة
   const matchedCmd = handler.commandsList.find(c => c.name === cmdName);
   if (matchedCmd) {
     await handler.runCommand(matchedCmd.name, message, args);

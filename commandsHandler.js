@@ -1,96 +1,32 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { MessageFlags } = require('discord.js');
+
+const commandsData = [
+  { name: 'ban', desc: 'حظر عضو من السيرفر' },
+  { name: 'unban', desc: 'فك الحظر عن عضو' },
+  { name: 'kick', desc: 'طرد عضو من السيرفر' },
+  { name: 'vkick', desc: 'طرد عضو من الروم الصوتي' },
+  { name: 'mutetext', desc: 'كتم كتابي لعضو' },
+  { name: 'unmutetext', desc: 'فك الكتم الكتابي' },
+  { name: 'mutevoice', desc: 'كتم صوتي لعضو' },
+  { name: 'unmutevoice', desc: 'فك الكتم الصوتي' },
+  { name: 'timeout', desc: 'إعطاء تايم أوت لعضو' },
+  { name: 'untimeout', desc: 'إزالة التايم أوت' },
+  { name: 'clear', desc: 'مسح عدد من الرسائل' },
+  { name: 'move', desc: 'نقل عضو لغرفة صوتية أخرى' },
+  { name: 'role', desc: 'إعطاء أو إزالة رتبة من عضو' },
+  { name: 'points', desc: 'عرض أو تعديل نقاط العضو' },
+  { name: 'warn', desc: 'إعطاء تحذير لعضو' },
+  { name: 'warn_remove', desc: 'إزالة تحذير من عضو' },
+  { name: 'warnings', desc: 'عرض تحذيرات العضو' },
+  { name: 'lock', desc: 'قفل القناة الحالية' },
+  { name: 'unlock', desc: 'فتح القناة الحالية' },
+  { name: 'setcolor', desc: 'تغيير لون الرتبة' },
+  { name: 'slowmode', desc: 'تحديد الوضع البطئ للقناة' },
+  { name: 'setnick', desc: 'تغيير لقب المستخدم' }
+];
 
 module.exports = {
-  commandsList: [
-  {
-    "name": "ban",
-    "desc": "حظر عضو من السيرفر"
-  },
-  {
-    "name": "unban",
-    "desc": "فك الحظر عن عضو"
-  },
-  {
-    "name": "kick",
-    "desc": "طرد عضو من السيرفر"
-  },
-  {
-    "name": "vkick",
-    "desc": "طرد عضو من الروم الصوتي"
-  },
-  {
-    "name": "mutetext",
-    "desc": "كتم كتابي لعضو"
-  },
-  {
-    "name": "unmutetext",
-    "desc": "فك الكتم الكتابي"
-  },
-  {
-    "name": "mutevoice",
-    "desc": "كتم صوتي لعضو"
-  },
-  {
-    "name": "unmutevoice",
-    "desc": "فك الكتم الصوتي"
-  },
-  {
-    "name": "timeout",
-    "desc": "إعطاء تايم أوت لعضو"
-  },
-  {
-    "name": "untimeout",
-    "desc": "إزالة التايم أوت"
-  },
-  {
-    "name": "clear",
-    "desc": "مسح عدد من الرسائل"
-  },
-  {
-    "name": "move",
-    "desc": "نقل عضو لغرفة صوتية أخرى"
-  },
-  {
-    "name": "role",
-    "desc": "إعطاء أو إزالة رتبة من عضو"
-  },
-  {
-    "name": "points",
-    "desc": "عرض أو تعديل نقاط العضو"
-  },
-  {
-    "name": "warn",
-    "desc": "إعطاء تحذير لعضو"
-  },
-  {
-    "name": "warn_remove",
-    "desc": "إزالة تحذير من عضو"
-  },
-  {
-    "name": "warnings",
-    "desc": "عرض تحذيرات العضو"
-  },
-  {
-    "name": "lock",
-    "desc": "قفل القناة الحالية"
-  },
-  {
-    "name": "unlock",
-    "desc": "فتح القناة الحالية"
-  },
-  {
-    "name": "setcolor",
-    "desc": "تغيير لون لون الرتبة"
-  },
-  {
-    "name": "slowmode",
-    "desc": "تحديد الوضع البطئ للقناة"
-  },
-  {
-    "name": "setnick",
-    "desc": "تغيير لقب المستخدم"
-  }
-],
+  commandsList: commandsData,
   
   async runCommand(commandName, ctx, args) {
     const isInteraction = !!ctx.isChatInputCommand;
@@ -98,7 +34,7 @@ module.exports = {
 
     const reply = async (content) => {
       if (isInteraction) {
-        return ctx.reply({ content, ephemeral: true });
+        return ctx.reply({ content, flags: MessageFlags.Ephemeral });
       } else {
         return ctx.channel.send({ content, allowedMentions: { repliedUser: false } });
       }
