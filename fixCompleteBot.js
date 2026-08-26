@@ -1,9 +1,13 @@
-const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder, ComponentType } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
+
+// 1. كود ملف help.js المطور
+const helpCode = `const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder, ComponentType } = require('discord.js');
 
 function buildHelpPayload() {
   const embed = new EmbedBuilder()
     .setTitle('⚡ OS System — Control Center')
-    .setDescription('> **مرحباً بك في لوحة تحكم OS.**\n> اختر القسم المطلوب من القائمة بالأسفل.')
+    .setDescription('> **مرحباً بك في لوحة تحكم OS.**\\n> اختر القسم المطلوب من القائمة بالأسفل.')
     .addFields(
       { name: '✈️ ban', value: 'حظر عضو من السيرفر' },
       { name: '🔓 unban', value: 'فك الحظر بواسطة ID' },
@@ -87,3 +91,10 @@ module.exports = {
     });
   }
 };
+`;
+
+fs.writeFileSync('help.js', helpCode);
+if (fs.existsSync('src/commands')) fs.writeFileSync('src/commands/help.js', helpCode);
+if (fs.existsSync('commands')) fs.writeFileSync('commands/help.js', helpCode);
+
+console.log('✅ Synchronized help command files.');
