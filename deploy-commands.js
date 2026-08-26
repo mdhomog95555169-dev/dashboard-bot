@@ -1,38 +1,44 @@
 require('dotenv').config();
-const { REST, Routes, SlashCommandBuilder } = require('discord.js');
+const { REST, Routes } = require('discord.js');
 const { commands } = require('./commands');
 
-function buildOption(builder, opt) {
-  const setup = (o) => o.setName(opt.name).setDescription(opt.description || opt.name).setRequired(!!opt.required);
-  switch (opt.type) {
-    case 'user': return builder.addUserOption(setup);
-    case 'role': return builder.addRoleOption(setup);
-    case 'channel': return builder.addChannelOption(setup);
-    case 'integer': return builder.addIntegerOption(setup);
-    default: return builder.addStringOption(setup);
-  }
-}
+const slashCmds = commands.map((c) => {
+  const obj = {
+    name: c.name,
+    description: c.description,
+    options: [],
+  };
 
-const body = commands.map((cmd) => {
-  const builder = new SlashCommandBuilder().setName(cmd.name).setDescription(cmd.description);
-  for (const opt of cmd.options || []) buildOption(builder, opt);
-  return builder.toJSON();
+  if (c.options) {
+    obj.options = c.options.map((opt) => {
+      let typeNum = 3; // STRING
+      if (opt.type === 'user') typeNum = 6;
+      if (opt.type === 'integer') typeNum = 4;
+      if (opt.type === 'role') typeNum = 8;
+      if (opt.type === 'channel') typeNum = 7;
+
+      return {
+        name: opt.name,
+        description: opt.description || opt.name,
+        type: typeNum,
+        required: !!opt.required,
+      };
+    });
+  }
+  return obj;
 });
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
 (async () => {
   try {
-    const clientId = process.env.CLIENT_ID;
-    const guildId = process.env.GUILD_ID;
-    if (guildId) {
-      await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body });
-      console.log(`✅ تم تسجيل ${body.length} أمر Slash على السيرفر (${guildId}).`);
-    } else {
-      await rest.put(Routes.applicationCommands(clientId), { body });
-      console.log(`✅ تم تسجيل ${body.length} أمر Slash عالمياً (قد يستغرق دقائق للظهور).`);
-    }
-  } catch (err) {
-    console.error(err);
+    console.log('⏳ جاري تسجيل أوامر الـ Slash Commands لدى ديسكورد...');
+    await rest.put(
+      Routes.applicationCommands(process.env.CLIENT_ID || '1343717142436843580'),
+      { body: slashCmds }
+    );
+    console.log('✅ تم تسجيل جميع الـ Slash Commands بنجاح!');
+  } catch (error) {
+    console.error('❌ حدث خطأ أثناء التسجيل:', error);
   }
 })();
