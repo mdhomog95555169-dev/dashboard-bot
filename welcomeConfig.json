@@ -1,0 +1,18 @@
+{
+  "enabled": true,
+  "imageEnabled": true,
+  "channelId": "",
+  "message": "Welcome {user} to {server}!",
+  "avatarX": 400,
+  "avatarY": 120,
+  "avatarRadius": 60,
+  "borderWidth": 4,
+  "borderColor": "#FFFFFF",
+  "textOverlay": "Welcome to Our Server",
+  "textColor": "#FFFFFF",
+  "textX": 400,
+  "textY": 300,
+  "fontSize": 32,
+  "bgUrl": "",
+  "bgImagePath": ""
+}

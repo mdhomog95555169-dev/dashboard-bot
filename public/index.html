@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>OSCORP RP - Advanced Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', sans-serif; -webkit-tap-highlight-color: transparent; }
+    
+    :root {
+      --primary: #6366f1;
+      --primary-glow: rgba(99, 102, 241, 0.4);
+      --bg-dark: #090c15;
+      --card-bg: rgba(15, 22, 38, 0.85);
+      --border: rgba(255, 255, 255, 0.08);
+      --text-muted: #94a3b8;
+      --success: #22c55e;
+    }
+
+    body {
+      background: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 10% 10%, rgba(99, 102, 241, 0.12) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(168, 85, 247, 0.12) 0%, transparent 40%);
+      color: #f8fafc;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .ticker-bar {
+      background: rgba(13, 17, 30, 0.9);
+      text-align: center;
+      padding: 6px 10px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #e2e8f0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .header {
+      background: rgba(11, 15, 25, 0.9);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .brand {
+      font-size: 20px;
+      font-weight: 900;
+      background: linear-gradient(135deg, #818cf8, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .layout { display: flex; flex: 1; max-width: 1200px; width: 100%; margin: 0 auto; }
+
+    .sidebar {
+      width: 260px;
+      background: rgba(11, 15, 25, 0.5);
+      border-left: 1px solid var(--border);
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .nav-link {
+      display: flex; align-items: center; gap: 12px; padding: 11px 16px; color: #94a3b8; border-radius: 12px; font-weight: 700; font-size: 14px; cursor: pointer; transition: 0.2s;
+    }
+    .nav-link.active {
+      background: linear-gradient(135deg, #6366f1, #4f46e5); color: #ffffff; box-shadow: 0 6px 18px -3px var(--primary-glow);
+    }
+
+    .main-content { flex: 1; padding: 20px; display: flex; justify-content: center; }
+    .tab-content { display: none; width: 100%; max-width: 800px; }
+    .tab-content.active { display: block; }
+
+    /* Dashboard Widgets */
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px; }
+    .widget-card {
+      background: var(--card-bg); border: 1px solid var(--border); border-radius: 18px; padding: 20px; backdrop-filter: blur(20px); display: flex; align-items: center; justify-content: space-between;
+    }
+    .widget-val { font-size: 24px; font-weight: 900; color: #fff; margin-top: 4px; }
+    .widget-lbl { font-size: 13px; color: var(--text-muted); font-weight: 700; }
+    .widget-icon { width: 50px; height: 50px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; color: #fff; }
+
+    /* Section Forms & Panels */
+    .panel-card {
+      background: var(--card-bg); border: 1px solid var(--border); border-radius: 18px; padding: 22px; margin-bottom: 20px; backdrop-filter: blur(20px);
+    }
+    .panel-header { font-size: 16px; font-weight: 800; color: #fff; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+    
+    .form-group { margin-bottom: 16px; }
+    .form-label { display: block; font-size: 13px; font-weight: 700; color: #cbd5e1; margin-bottom: 8px; }
+    .form-input, .form-select, .form-textarea {
+      width: 100%; background: #1e293b; border: 1px solid #334155; padding: 12px 14px; border-radius: 12px; color: #fff; font-size: 14px; outline: none; transition: 0.2s;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: #6366f1; }
+    .form-textarea { resize: vertical; min-height: 100px; }
+
+    .switch-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .switch-row:last-child { border-bottom: none; }
+
+    /* Switch Component */
+    .switch { position: relative; display: inline-block; width: 46px; height: 24px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #334155; transition: .3s; border-radius: 30px; }
+    .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+    input:checked + .slider { background-color: #3b82f6; }
+    input:checked + .slider:before { transform: translateX(22px); }
+
+    /* Commands Styling */
+    .stats-banner {
+      background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.25); color: #818cf8; padding: 14px 20px; border-radius: 16px; font-size: 14px; font-weight: 800; display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;
+    }
+    .cmd-card {
+      background: var(--card-bg); border: 1px solid var(--border); border-radius: 18px; padding: 20px; margin-bottom: 16px; backdrop-filter: blur(20px);
+    }
+    .cmd-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .cmd-title-group { display: flex; align-items: center; gap: 12px; }
+    .cmd-icon-box { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #fff; }
+    .cmd-name { font-size: 18px; font-weight: 800; color: #f8fafc; }
+    .cmd-details { display: flex; flex-direction: column; gap: 6px; font-size: 13px; margin-bottom: 16px; }
+    .detail-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .detail-label { color: var(--text-muted); font-weight: 700; }
+    .detail-val { color: #e2e8f0; font-weight: 600; }
+    .usage-badge { background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(56, 189, 248, 0.2); color: #38bdf8; padding: 4px 10px; border-radius: 8px; font-family: monospace; font-weight: 700; font-size: 12px; }
+    .alias-badge { color: #38bdf8; font-weight: 700; background: rgba(56, 189, 248, 0.1); padding: 2px 8px; border-radius: 6px; font-size: 12px; margin-left: 4px; }
+    .cmd-actions { display: flex; gap: 10px; }
+    .btn-action { padding: 8px 18px; border-radius: 10px; border: none; font-size: 13px; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: 0.2s; }
+    .btn-edit { background: #2563eb; color: #ffffff; }
+    .btn-edit:hover { background: #1d4ed8; }
+    .btn-remove { background: #dc2626; color: #ffffff; }
+    .btn-remove:hover { background: #b91c1c; }
+    .btn-submit { background: #6366f1; color: #fff; padding: 12px 24px; border-radius: 12px; border: none; font-weight: 800; cursor: pointer; transition: 0.2s; width: 100%; margin-top: 10px; }
+    .btn-submit:hover { background: #4f46e5; }
+
+    /* Modal Styling */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center; z-index: 1000;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-box {
+      background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; width: 92%; max-width: 480px; padding: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+    }
+    .modal-title { font-size: 18px; font-weight: 800; color: #fff; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; }
+    .alias-bars-container { display: flex; flex-direction: column; gap: 10px; max-height: 250px; overflow-y: auto; margin-bottom: 14px; padding-left: 4px; }
+    .alias-input-row { display: flex; align-items: center; gap: 8px; }
+    .alias-input { flex: 1; background: #1e293b; border: 1px solid #334155; padding: 10px 14px; border-radius: 12px; color: #fff; font-size: 14px; outline: none; }
+    .alias-input:focus { border-color: #6366f1; }
+    .btn-del-bar { background: rgba(220, 38, 38, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; }
+    .btn-del-bar:hover { background: #dc2626; color: #fff; }
+    .btn-add-bar { background: rgba(99, 102, 241, 0.15); border: 1px dashed #6366f1; color: #818cf8; width: 100%; padding: 10px; border-radius: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; margin-bottom: 20px; transition: 0.2s; }
+    .btn-add-bar:hover { background: rgba(99, 102, 241, 0.25); color: #fff; }
+    .modal-btns { display: flex; justify-content: flex-end; gap: 10px; }
+    .btn-modal-cancel { background: #334155; color: #fff; padding: 9px 20px; border-radius: 10px; border: none; font-weight: 700; cursor: pointer; }
+    .btn-modal-save { background: #6366f1; color: #fff; padding: 9px 22px; border-radius: 10px; border: none; font-weight: 700; cursor: pointer; }
+
+    @media (max-width: 820px) {
+      .layout { flex-direction: column; }
+      .sidebar { width: 100%; border-left: none; border-bottom: 1px solid var(--border); flex-direction: row; overflow-x: auto; padding: 8px; }
+      .nav-link { white-space: nowrap; padding: 8px 12px; font-size: 12px; }
+      .main-content { padding: 12px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="ticker-bar">
+    <i class="fa-solid fa-sparkles"></i>
+    <span>✨ سبحان الله وبحمده ، سبحان الله العظيم ✨</span>
+  </div>
+
+  <header class="header">
+    <div class="brand"><i class="fa-solid fa-shield-cat"></i> OSCORP RP</div>
+    <div class="user-profile"><i class="fa-solid fa-user"></i> <span>nfyp_ Admin</span></div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="nav-link active" onclick="switchTab('dashboard', this)"><i class="fa-solid fa-chart-line"></i> Dashboard</div>
+      <div class="nav-link" onclick="switchTab('welcome', this)"><i class="fa-solid fa-address-card"></i> Welcome System</div>
+      <div class="nav-link" onclick="switchTab('commands', this)"><i class="fa-solid fa-cubes-stacked"></i> Commands & Aliases</div>
+      <div class="nav-link" onclick="switchTab('guild', this)"><i class="fa-solid fa-server"></i> Guild Support</div>
+      <div class="nav-link" onclick="switchTab('settings', this)"><i class="fa-solid fa-sliders"></i> Settings</div>
+    </aside>
+
+    <main class="main-content">
+      
+      <!-- TAB 1: DASHBOARD -->
+      <div id="tab-dashboard" class="tab-content active">
+        <div class="grid-2">
+          <div class="widget-card">
+            <div>
+              <div class="widget-lbl">إجمالي الاعضاء</div>
+              <div class="widget-val">12,480</div>
+            </div>
+            <div class="widget-icon" style="background: linear-gradient(135deg, #6366f1, #4f46e5);"><i class="fa-solid fa-users"></i></div>
+          </div>
+          <div class="widget-card">
+            <div>
+              <div class="widget-lbl">حالة البوت</div>
+              <div class="widget-val" style="color:#22c55e;">متصل (Online)</div>
+            </div>
+            <div class="widget-icon" style="background: linear-gradient(135deg, #10b981, #047857);"><i class="fa-solid fa-signal"></i></div>
+          </div>
+          <div class="widget-card">
+            <div>
+              <div class="widget-lbl">التذاكر المفتوحة</div>
+              <div class="widget-val">8 تذاكر</div>
+            </div>
+            <div class="widget-icon" style="background: linear-gradient(135deg, #f59e0b, #b45309);"><i class="fa-solid fa-ticket"></i></div>
+          </div>
+          <div class="widget-card">
+            <div>
+              <div class="widget-lbl">سرعة الاستجابة</div>
+              <div class="widget-val">24ms</div>
+            </div>
+            <div class="widget-icon" style="background: linear-gradient(135deg, #06b6d4, #0e7490);"><i class="fa-solid fa-bolt"></i></div>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-header"><i class="fa-solid fa-chart-area" style="color:#6366f1;"></i> نشاط السيرفر اليومي</div>
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">معدل الأوامر والرسائل المنفذة خلال الـ 24 ساعة الماضية.</p>
+          <div style="background: rgba(255,255,255,0.03); height: 160px; border-radius: 12px; display: flex; align-items: flex-end; justify-content: space-around; padding: 15px;">
+            <div style="width: 10%; background: #6366f1; height: 40%; border-radius: 6px;"></div>
+            <div style="width: 10%; background: #6366f1; height: 65%; border-radius: 6px;"></div>
+            <div style="width: 10%; background: #6366f1; height: 90%; border-radius: 6px;"></div>
+            <div style="width: 10%; background: #6366f1; height: 50%; border-radius: 6px;"></div>
+            <div style="width: 10%; background: #6366f1; height: 75%; border-radius: 6px;"></div>
+            <div style="width: 10%; background: #6366f1; height: 95%; border-radius: 6px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: WELCOME SYSTEM -->
+      <div id="tab-welcome" class="tab-content">
+        <div class="panel-card">
+          <div class="panel-header"><i class="fa-solid fa-door-open" style="color:#6366f1;"></i> نظام الترحيب بالأعضاء الجدد</div>
+          
+          <div class="switch-row">
+            <div>
+              <div style="font-size: 14px; font-weight: 700;">تفعيل الترحيب في الشات</div>
+              <div style="font-size: 12px; color: var(--text-muted);">إرسال رسالة ترحيبية فور انضمام عضو جديد.</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+          </div>
+
+          <div class="switch-row" style="margin-bottom: 16px;">
+            <div>
+              <div style="font-size: 14px; font-weight: 700;">إرسال رسالة في الخاص (DM)</div>
+              <div style="font-size: 12px; color: var(--text-muted);">إرسال رسالة ترحيب وقوانين على الخاص.</div>
+            </div>
+            <label class="switch"><input type="checkbox"><span class="slider"></span></label>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">روم الترحيب (Welcome Channel)</label>
+            <select class="form-select">
+              <option>👋🏻-welcome (120492049284)</option>
+              <option>💬-chat-general</option>
+              <option>📢-announcements</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">نص رسالة الترحيب</label>
+            <textarea class="form-textarea" placeholder="أهلاً بك {user} في سيرفر OSCORP RP! نتمنى لك وقتاً ممتعاً.">أهلاً بك {user} في سيرفر OSCORP RP! نورت السيرفر يا غالي ❤️</textarea>
+          </div>
+
+          <button class="btn-submit"><i class="fa-solid fa-floppy-disk"></i> حفظ إعدادات الترحيب</button>
+        </div>
+      </div>
+
+      <!-- TAB 3: COMMANDS & ALIASES -->
+      <div id="tab-commands" class="tab-content">
+        <div class="stats-banner">
+          <span><i class="fa-solid fa-terminal"></i> قائمة أوامر البوت المتاحة (Bot Commands & Aliases)</span>
+          <span style="font-size: 12px; background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 20px; color: #fff;" id="cmdCount">Active Commands 24</span>
+        </div>
+
+        <div id="commandsList"></div>
+      </div>
+
+      <!-- TAB 4: GUILD SUPPORT -->
+      <div id="tab-guild" class="tab-content">
+        <div class="panel-card">
+          <div class="panel-header"><i class="fa-solid fa-headset" style="color:#6366f1;"></i> إعدادات الدعم الفني والتذاكر (Tickets System)</div>
+          
+          <div class="form-group">
+            <label class="form-label">روم إنشاء التذاكر (Ticket Panel Channel)</label>
+            <select class="form-select">
+              <option>🎫-open-ticket</option>
+              <option>🛠️-support-desk</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">رتبة الدعم الفني (Support Role)</label>
+            <select class="form-select">
+              <option>🛡️ Admin / Moderator</option>
+              <option>👑 Head Admin</option>
+              <option>🤝 Support Team</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">رسالة التذكرة المفتوحة</label>
+            <textarea class="form-textarea" placeholder="مرحباً بك! يرجى كتابة مشكلتك وسيقوم فريق الدعم بالرد عليك قريباً."></textarea>
+          </div>
+
+          <button class="btn-submit"><i class="fa-solid fa-floppy-disk"></i> حفظ نظام التذاكر</button>
+        </div>
+      </div>
+
+      <!-- TAB 5: SETTINGS -->
+      <div id="tab-settings" class="tab-content">
+        <div class="panel-card">
+          <div class="panel-header"><i class="fa-solid fa-gear" style="color:#6366f1;"></i> إعدادات البوت العامة</div>
+          
+          <div class="form-group">
+            <label class="form-label">بادئة الأوامر (Bot Prefix)</label>
+            <input type="text" class="form-input" value="-">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">لغة البوت (Bot Language)</label>
+            <select class="form-select">
+              <option>العربية (Arabic)</option>
+              <option>English</option>
+            </select>
+          </div>
+
+          <div class="switch-row">
+            <div>
+              <div style="font-size: 14px; font-weight: 700;">وضع الصيانة (Maintenance Mode)</div>
+              <div style="font-size: 12px; color: var(--text-muted);">تعطيل استجابة البوت للأوامر مؤقتاً.</div>
+            </div>
+            <label class="switch"><input type="checkbox"><span class="slider"></span></label>
+          </div>
+
+          <button class="btn-submit" style="margin-top:20px;"><i class="fa-solid fa-floppy-disk"></i> حفظ الإعدادات العامة</button>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Custom Alias Modal -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal-box">
+      <div class="modal-title">
+        <span><i class="fa-solid fa-sliders" style="color:#6366f1;"></i> تعديل اختصارات (<span id="modalCmdName">Ban</span>)</span>
+        <span style="font-size: 12px; color: #94a3b8;" id="barCounter">(0/5)</span>
+      </div>
+
+      <div class="alias-bars-container" id="barsContainer"></div>
+
+      <button class="btn-add-bar" id="btnAddBar" onclick="addAliasBar()"><i class="fa-solid fa-plus"></i> إضافة اختصار جديد</button>
+
+      <div class="modal-btns">
+        <button class="btn-modal-cancel" onclick="closeCustomModal()">إلغاء</button>
+        <button class="btn-modal-save" onclick="saveCustomModal()">حفظ التغيرات</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 24 أمراً كاملاً
+    let commandsData = [
+      { id: 'setnick', name: '/setnick', icon: 'fa-user-pen', color: 'linear-gradient(135deg, #6366f1, #4f46e5)', dev: 'Mohammed Alhajri', desc: 'Change member nickname in server.', usage: '/setnick / -setnick / setnick', aliases: [] },
+      { id: 'ban', name: '/ban', icon: 'fa-hammer', color: 'linear-gradient(135deg, #ef4444, #991b1b)', dev: 'Mohammed Alhajri', desc: 'Ban a member permanently.', usage: '/ban / -ban / ban', aliases: [] },
+      { id: 'unban', name: '/unban', icon: 'fa-unlock', color: 'linear-gradient(135deg, #22c55e, #15803d)', dev: 'Mohammed Alhajri', desc: 'Unban a member using ID.', usage: '/unban / -unban / unban', aliases: [] },
+      { id: 'kick', name: '/kick', icon: 'fa-user-slash', color: 'linear-gradient(135deg, #f59e0b, #b45309)', dev: 'Mohammed Alhajri', desc: 'Kick a member from server.', usage: '/kick / -kick / kick', aliases: [] },
+      { id: 'vkick', name: '/vkick', icon: 'fa-phone-slash', color: 'linear-gradient(135deg, #d97706, #92400e)', dev: 'Mohammed Alhajri', desc: 'Kick a member from voice channel.', usage: '/vkick / -vkick / vkick', aliases: [] },
+      { id: 'mute_text', name: '/mute text', icon: 'fa-comment-slash', color: 'linear-gradient(135deg, #6366f1, #3730a3)', dev: 'Mohammed Alhajri', desc: 'Mute member in text channels.', usage: '/mute text / -mute text / mute text', aliases: [] },
+      { id: 'unmute_text', name: '/unmute text', icon: 'fa-comment', color: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', dev: 'Mohammed Alhajri', desc: 'Unmute member in text channels.', usage: '/unmute text / -unmute text / unmute text', aliases: [] },
+      { id: 'mute_voice', name: '/mute voice', icon: 'fa-microphone-slash', color: 'linear-gradient(135deg, #8b5cf6, #5b21b6)', dev: 'Mohammed Alhajri', desc: 'Mute member in voice channels.', usage: '/mute voice / -mute voice / mute voice', aliases: [] },
+      { id: 'unmute_voice', name: '/unmute voice', icon: 'fa-microphone', color: 'linear-gradient(135deg, #10b981, #047857)', dev: 'Mohammed Alhajri', desc: 'Unmute member in voice channels.', usage: '/unmute voice / -unmute voice / unmute voice', aliases: [] },
+      { id: 'timeout', name: '/timeout', icon: 'fa-clock-rotate-left', color: 'linear-gradient(135deg, #f43f5e, #9f1239)', dev: 'Mohammed Alhajri', desc: 'Timeout a member.', usage: '/timeout / -timeout / timeout', aliases: [] },
+      { id: 'untimeout', name: '/untimeout', icon: 'fa-circle-check', color: 'linear-gradient(135deg, #10b981, #065f46)', dev: 'Mohammed Alhajri', desc: 'Remove timeout from member.', usage: '/untimeout / -untimeout / untimeout', aliases: [] },
+      { id: 'clear', name: '/clear', icon: 'fa-broom', color: 'linear-gradient(135deg, #06b6d4, #0e7490)', dev: 'Mohammed Alhajri', desc: 'Clear messages from channel.', usage: '/clear / -clear / clear', aliases: [] },
+      { id: 'move', name: '/move', icon: 'fa-right-left', color: 'linear-gradient(135deg, #a855f7, #6b21a8)', dev: 'Mohammed Alhajri', desc: 'Move member between voice channels.', usage: '/move / -move / move', aliases: [] },
+      { id: 'role', name: '/role', icon: 'fa-user-shield', color: 'linear-gradient(135deg, #ec4899, #9d174d)', dev: 'Mohammed Alhajri', desc: 'Add or remove role from member.', usage: '/role / -role / role', aliases: [] },
+      { id: 'points', name: '/points', icon: 'fa-star', color: 'linear-gradient(135deg, #eab308, #854d0e)', dev: 'Mohammed Alhajri', desc: 'Manage or view member points.', usage: '/points / -points / points', aliases: [] },
+      { id: 'warn', name: '/warn', icon: 'fa-triangle-exclamation', color: 'linear-gradient(135deg, #f97316, #9a3412)', dev: 'Mohammed Alhajri', desc: 'Warn a member.', usage: '/warn / -warn / warn', aliases: [] },
+      { id: 'warn_remove', name: '/warn_remove', icon: 'fa-file-circle-xmark', color: 'linear-gradient(135deg, #84cc16, #3f6212)', dev: 'Mohammed Alhajri', desc: 'Remove warning from member.', usage: '/warn_remove / -warn_remove / warn_remove', aliases: [] },
+      { id: 'warnings', name: '/warnings', icon: 'fa-folder-open', color: 'linear-gradient(135deg, #64748b, #334155)', dev: 'Mohammed Alhajri', desc: 'View member warnings list.', usage: '/warnings / -warnings / warnings', aliases: [] },
+      { id: 'lock', name: '/lock', icon: 'fa-lock', color: 'linear-gradient(135deg, #475569, #0f172a)', dev: 'Mohammed Alhajri', desc: 'Lock current channel.', usage: '/lock / -lock / lock', aliases: [] },
+      { id: 'unlock', name: '/unlock', icon: 'fa-lock-open', color: 'linear-gradient(135deg, #38bdf8, #0369a1)', dev: 'Mohammed Alhajri', desc: 'Unlock current channel.', usage: '/unlock / -unlock / unlock', aliases: [] },
+      { id: 'setcolor', name: '/setcolor', icon: 'fa-palette', color: 'linear-gradient(135deg, #d946ef, #86198f)', dev: 'Mohammed Alhajri', desc: 'Change member or role color.', usage: '/setcolor / -setcolor / setcolor', aliases: [] },
+      { id: 'slowmode', name: '/slowmode', icon: 'fa-gauge-high', color: 'linear-gradient(135deg, #f59e0b, #b45309)', dev: 'Mohammed Alhajri', desc: 'Set channel slowmode duration.', usage: '/slowmode / -slowmode / slowmode', aliases: [] },
+      { id: 'reset', name: '/reset', icon: 'fa-rotate-left', color: 'linear-gradient(135deg, #dc2626, #7f1d1d)', dev: 'Mohammed Alhajri', desc: 'Reset settings to default.', usage: '/reset / -reset / reset', aliases: [] }
+    ];
+
+    let currentCmdId = '';
+
+    function renderCommands() {
+      const list = document.getElementById('commandsList');
+      if(!list) return;
+      list.innerHTML = '';
+      commandsData.forEach(cmd => {
+        const aliasesHtml = cmd.aliases.map(a => `<span class="alias-badge">${a}</span>`).join(' ');
+        list.innerHTML += `
+          <div class="cmd-card" id="card-${cmd.id}">
+            <div class="cmd-header">
+              <div class="cmd-title-group">
+                <div class="cmd-icon-box" style="background: ${cmd.color};"><i class="fa-solid ${cmd.icon}"></i></div>
+                <div class="cmd-name">${cmd.name}</div>
+              </div>
+              <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+            </div>
+            <div class="cmd-details">
+              <div class="detail-row"><span class="detail-label">Developer:</span><span class="detail-val">${cmd.dev}</span></div>
+              <div class="detail-row"><span class="detail-label">Description:</span><span class="detail-val">${cmd.desc}</span></div>
+              <div class="detail-row" style="margin-top:4px;"><span class="detail-label">Usage:</span><span class="usage-badge">${cmd.usage}</span></div>
+              <div class="detail-row" style="margin-top:2px;"><span class="detail-label">Aliases:</span> <span id="aliases-list-${cmd.id}">${aliasesHtml || 'لا يوجد'}</span></div>
+            </div>
+            <div class="cmd-actions">
+              <button class="btn-action btn-edit" onclick="openCustomModal('${cmd.id}')"><i class="fa-solid fa-pen-to-square"></i> Edit Aliases</button>
+              <button class="btn-action btn-remove" onclick="removeCard('${cmd.id}')"><i class="fa-solid fa-trash-can"></i> Remove</button>
+            </div>
+          </div>
+        `;
+      });
+      document.getElementById('cmdCount').innerText = `Active Commands ${commandsData.length}`;
+    }
+
+    function switchTab(tabName, element) {
+      document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+      document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+      const selectedTab = document.getElementById('tab-' + tabName);
+      if (selectedTab) selectedTab.classList.add('active');
+      if (element) element.classList.add('active');
+    }
+
+    function openCustomModal(cmdId) {
+      currentCmdId = cmdId;
+      const cmd = commandsData.find(c => c.id === cmdId);
+      if (!cmd) return;
+
+      document.getElementById('modalCmdName').innerText = cmd.name;
+      const container = document.getElementById('barsContainer');
+      container.innerHTML = '';
+
+      if (cmd.aliases.length === 0) {
+        addAliasBar('');
+      } else {
+        cmd.aliases.forEach(alias => addAliasBar(alias));
+      }
+
+      updateBarState();
+      document.getElementById('editModal').classList.add('active');
+    }
+
+    function addAliasBar(val = '') {
+      const container = document.getElementById('barsContainer');
+      if (container.children.length >= 5) return;
+
+      const row = document.createElement('div');
+      row.className = 'alias-input-row';
+      row.innerHTML = `
+        <input type="text" class="alias-input" value="${val}" placeholder="أدخل اختصار">
+        <button class="btn-del-bar" onclick="removeBar(this)"><i class="fa-solid fa-xmark"></i></button>
+      `;
+      container.appendChild(row);
+      updateBarState();
+    }
+
+    function removeBar(btn) {
+      btn.parentElement.remove();
+      updateBarState();
+    }
+
+    function updateBarState() {
+      const container = document.getElementById('barsContainer');
+      const count = container.children.length;
+      document.getElementById('barCounter').innerText = `(${count}/5)`;
+      
+      const btnAdd = document.getElementById('btnAddBar');
+      if (count >= 5) {
+        btnAdd.style.display = 'none';
+      } else {
+        btnAdd.style.display = 'flex';
+      }
+    }
+
+    function closeCustomModal() {
+      document.getElementById('editModal').classList.remove('active');
+    }
+
+    function saveCustomModal() {
+      const cmd = commandsData.find(c => c.id === currentCmdId);
+      if (!cmd) return;
+
+      const inputs = document.querySelectorAll('.alias-input');
+      const newAliases = [];
+      inputs.forEach(input => {
+        const value = input.value.trim();
+        if (value !== '' && !newAliases.includes(value)) {
+          newAliases.push(value);
+        }
+      });
+
+      cmd.aliases = newAliases;
+      renderCommands();
+      closeCustomModal();
+    }
+
+    function removeCard(cmdId) {
+      commandsData = commandsData.filter(c => c.id !== cmdId);
+      renderCommands();
+    }
+
+    renderCommands();
+  </script>
+</body>
+</html>
