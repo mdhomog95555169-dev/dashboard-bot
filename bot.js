@@ -14,7 +14,7 @@ const client = new Client({
 const PREFIX = '-';
 
 client.once('ready', () => {
-  console.log(`✅ Bot ready as ${client.user.tag}`);
+  console.log(`✅ Bot live: ${client.user.tag}`);
 });
 
 client.on('messageCreate', async (message) => {
