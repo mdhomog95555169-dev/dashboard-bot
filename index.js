@@ -1,7 +1,7 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Partials, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, Collection, EmbedBuilder } = require('discord.js');
 const http = require('http');
-const { commands } = require('./commands');
+const { commands, createEmbed } = require('./commands');
 
 const PREFIX = '-';
 
@@ -44,31 +44,61 @@ function resolveChannelArg(guild, raw, fallback) {
   return guild.channels.cache.get(id) || fallback;
 }
 
-function reply(target, isSlash, content) {
-  const payload = typeof content === 'string' ? { content } : content;
-  return target.reply(payload);
+function buildContext(guild, channel, invoker, isSlash, rawObj, optsFetcher) {
+  const replyEmbed = (embed) => rawObj.reply({ embeds: [embed] });
+  const replySuccess = (messageText, fields = []) => {
+    const embed = new EmbedBuilder()
+      .setColor('#57F287')
+      .setTitle('✅ نجاح العملية')
+      .setDescription(messageText)
+      .setFooter({ text: 'OS System Engine' })
+      .setTimestamp();
+    if (fields.length) embed.addFields(fields);
+    return rawObj.reply({ embeds: [embed] });
+  };
+  const replyError = (messageText) => {
+    const embed = new EmbedBuilder()
+      .setColor('#ED4245')
+      .setTitle('❌ خطأ في التنفيذ')
+      .setDescription(messageText)
+      .setFooter({ text: 'OS System Engine' })
+      .setTimestamp();
+    return rawObj.reply({ embeds: [embed], ephemeral: isSlash });
+  };
+
+  return {
+    guild,
+    channel,
+    invoker,
+    isSlash,
+    raw: rawObj,
+    replyEmbed,
+    replySuccess,
+    replyError,
+    ...optsFetcher
+  };
 }
 
 function buildSlashCtx(interaction) {
-  const guild = interaction.guild;
   const opts = interaction.options;
-  return {
-    guild,
-    channel: interaction.channel,
-    invoker: interaction.member,
-    isSlash: true,
-    raw: interaction,
-    getUserMember: async (name) => {
-      const u = opts.getUser(name);
-      if (!u) return null;
-      try { return await guild.members.fetch(u.id); } catch { return null; }
-    },
-    getString: (name) => opts.getString(name),
-    getInteger: (name) => opts.getInteger(name),
-    getRole: (name) => opts.getRole(name),
-    getChannel: (name) => opts.getChannel(name) || interaction.channel,
-    reply: (content) => reply(interaction, true, content),
-  };
+  return buildContext(
+    interaction.guild,
+    interaction.channel,
+    interaction.member,
+    true,
+    interaction,
+    {
+      getUserMember: async (name) => {
+        const u = opts.getUser(name);
+        if (!u) return null;
+        try { return await interaction.guild.members.fetch(u.id); } catch { return null; }
+      },
+      getString: (name) => opts.getString(name),
+      getInteger: (name) => opts.getInteger(name),
+      getRole: (name) => opts.getRole(name),
+      getChannel: (name) => opts.getChannel(name) || interaction.channel,
+    }
+  );
 }
 
 async function buildPrefixCtx(message, args, optionDefs) {
@@ -99,19 +129,21 @@ async function buildPrefixCtx(message, args, optionDefs) {
       }
     }
   }
-  return {
+
+  return buildContext(
     guild,
-    channel: message.channel,
-    invoker: message.member,
-    isSlash: false,
-    raw: message,
-    getUserMember: async (name) => parsed[name] || null,
-    getString: (name) => parsed[name] || null,
-    getInteger: (name) => (typeof parsed[name] === 'number' ? parsed[name] : null),
-    getRole: (name) => parsed[name] || null,
-    getChannel: (name) => parsed[name] || message.channel,
-    reply: (content) => reply(message, false, content),
-  };
+    message.channel,
+    message.member,
+    false,
+    message,
+    {
+      getUserMember: async (name) => parsed[name] || null,
+      getString: (name) => parsed[name] || null,
+      getInteger: (name) => (typeof parsed[name] === 'number' ? parsed[name] : null),
+      getRole: (name) => parsed[name] || null,
+      getChannel: (name) => parsed[name] || message.channel,
+    }
+  );
 }
 
 client.once('ready', () => {
@@ -124,7 +156,11 @@ client.on('interactionCreate', async (interaction) => {
   if (!command) return;
 
   if (command.permission && !checkPermission(interaction.member, command.permission)) {
-    return interaction.reply({ content: '❌ لا تملك الصلاحية لاستخدام هذا الأمر.', ephemeral: true });
+    const errEmbed = new EmbedBuilder()
+      .setColor('#ED4245')
+      .setTitle('❌ ليس لديك صلاحية')
+      .setDescription('أنت لا تملك الصلاحيات الكافية لاستخدام هذا الأمر.');
+    return interaction.reply({ embeds: [errEmbed], ephemeral: true });
   }
 
   try {
@@ -132,9 +168,6 @@ client.on('interactionCreate', async (interaction) => {
     await command.execute(ctx);
   } catch (err) {
     console.error(err);
-    const payload = { content: '⚠️ حدث خطأ أثناء تنفيذ الأمر.', ephemeral: true };
-    if (interaction.deferred || interaction.replied) await interaction.editReply(payload);
-    else await interaction.reply(payload);
   }
 });
 
@@ -148,7 +181,11 @@ client.on('messageCreate', async (message) => {
   if (!command) return;
 
   if (command.permission && !checkPermission(message.member, command.permission)) {
-    return message.reply('❌ لا تملك الصلاحية لاستخدام هذا الأمر.');
+    const errEmbed = new EmbedBuilder()
+      .setColor('#ED4245')
+      .setTitle('❌ ليس لديك صلاحية')
+      .setDescription('أنت لا تملك الصلاحيات الكافية لاستخدام هذا الأمر.');
+    return message.reply({ embeds: [errEmbed] });
   }
 
   try {
@@ -156,7 +193,6 @@ client.on('messageCreate', async (message) => {
     await command.execute(ctx);
   } catch (err) {
     console.error(err);
-    message.reply('⚠️ حدث خطأ أثناء تنفيذ الأمر.');
   }
 });
 
@@ -164,7 +200,7 @@ client.login(process.env.DISCORD_TOKEN);
 
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-  res.end('Oscorp RP Bot is running.');
+  res.end('Oscorp RP Bot ProBot Style is Online.');
 });
 
 server.listen(process.env.PORT || 3000, () => {

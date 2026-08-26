@@ -1,5 +1,15 @@
-const { PermissionFlagsBits } = require('discord.js');
+const { PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const { getWarnings, addWarning, removeWarning, getPoints, addPoints } = require('./data');
+
+// دالة إنشاء Embed بتنسيق برو بوت
+function createEmbed(title, description, color = '#5865F2', footer = 'OS | System Engine') {
+  return new EmbedBuilder()
+    .setColor(color)
+    .setTitle(title)
+    .setDescription(description)
+    .setFooter({ text: footer })
+    .setTimestamp();
+}
 
 async function ensureMutedRole(guild) {
   let role = guild.roles.cache.find((r) => r.name === 'Muted-Text');
@@ -28,6 +38,25 @@ function parseDuration(input) {
 
 const commands = [
   {
+    name: 'help',
+    description: 'عرض قائمة الأوامر المتاحة في البوت',
+    execute: async (ctx) => {
+      const embed = new EmbedBuilder()
+        .setColor('#5865F2')
+        .setTitle('⚡ OS System — Control Center')
+        .setDescription('مرحباً بك في لوحة تحكم OS.\nقائمة الأوامر المتاحة الموزعة حسب الصلاحيات:')
+        .addFields(
+          { name: '🛡️ أوامر الإدارة والطرد', value: '`/ban` | `/unban` | `/kick` | `/vkick` | `/timeout` | `/untimeout`', inline: false },
+          { name: '🔇 أوامر الكتم والإسكات', value: '`/mutetext` | `/unmutetext` | `/mutevoice` | `/unmutevoice`', inline: false },
+          { name: '⚠️ التحذيرات والنقاط', value: '`/warn` | `/warn_remove` | `/warnings` | `/points`', inline: false },
+          { name: '⚙️ إدارة القنوات والرتب', value: '`/clear` | `/lock` | `/unlock` | `/role` | `/setcolor` | `/slowmode` | `/setnick`', inline: false }
+        )
+        .setFooter({ text: 'OS System Engine' })
+        .setTimestamp();
+      return ctx.replyEmbed(embed);
+    }
+  },
+  {
     name: 'ban',
     description: 'حظر عضو من السيرفر',
     permission: PermissionFlagsBits.BanMembers,
@@ -37,26 +66,30 @@ const commands = [
     ],
     execute: async (ctx) => {
       const member = await ctx.getUserMember('user');
-      const reason = ctx.getString('reason') || 'لا يوجد سبب';
-      if (!member) return ctx.reply('❌ لم يتم العثور على العضو.');
-      if (!member.bannable) return ctx.reply('❌ لا يمكنني حظر هذا العضو (صلاحيات أعلى مني).');
+      const reason = ctx.getString('reason') || 'لا يوجد سبب محدد';
+      if (!member) return ctx.replyError('لم يتم العثور على هذا العضو في السيرفر.');
+      if (!member.bannable) return ctx.replyError('لا يمكنني حظر هذا العضو (رتبته أعلى مني أو يملك صلاحيات إدارة).');
+      
       await member.ban({ reason });
-      return ctx.reply(`✅ تم حظر **${member.user.tag}**\nالسبب: ${reason}`);
+      return ctx.replySuccess(`تم حظر العضو **${member.user.tag}** بنجاح.`, [
+        { name: 'السبب', value: reason, inline: true },
+        { name: 'المشرف', value: `<@${ctx.invoker.id}>`, inline: true }
+      ]);
     },
   },
   {
     name: 'unban',
-    description: 'فك حظر عضو عبر الآيدي',
+    description: 'فك حظر عضو بواسطة الآيدي',
     permission: PermissionFlagsBits.BanMembers,
-    options: [{ name: 'user_id', type: 'string', required: true, description: 'آيدي العضو' }],
+    options: [{ name: 'user_id', type: 'string', required: true, description: 'آيدي العضو (ID)' }],
     execute: async (ctx) => {
       const id = ctx.getString('user_id');
-      if (!id) return ctx.reply('❌ يجب إدخال آيدي العضو.');
+      if (!id) return ctx.replyError('يرجى تحديد آيدي العضو المراد فك الحظر عنه.');
       try {
-        await ctx.guild.bans.remove(id, 'فك حظر عبر الأمر');
-        return ctx.reply(`✅ تم فك الحظر عن العضو صاحب الآيدي \`${id}\`.`);
+        await ctx.guild.bans.remove(id, `فك حظر بواسطة ${ctx.invoker.user.tag}`);
+        return ctx.replySuccess(`تم فك الحظر عن الحساب صاحب الآيدي \`${id}\` بنجاح.`);
       } catch {
-        return ctx.reply('❌ لم يتم العثور على حظر بهذا الآيدي.');
+        return ctx.replyError('لم يتم العثور على حظر مسجل بهذا الآيدي.');
       }
     },
   },
@@ -70,24 +103,13 @@ const commands = [
     ],
     execute: async (ctx) => {
       const member = await ctx.getUserMember('user');
-      const reason = ctx.getString('reason') || 'لا يوجد سبب';
-      if (!member) return ctx.reply('❌ لم يتم العثور على العضو.');
-      if (!member.kickable) return ctx.reply('❌ لا يمكنني طرد هذا العضو.');
+      const reason = ctx.getString('reason') || 'لا يوجد سبب محدد';
+      if (!member) return ctx.replyError('لم يتم العثور على العضو.');
+      if (!member.kickable) return ctx.replyError('لا يمكن طرد هذا العضو بسبب رتبته.');
       await member.kick(reason);
-      return ctx.reply(`✅ تم طرد **${member.user.tag}**\nالسبب: ${reason}`);
-    },
-  },
-  {
-    name: 'vkick',
-    description: 'طرد عضو من الروم الصوتي',
-    permission: PermissionFlagsBits.MoveMembers,
-    options: [{ name: 'user', type: 'user', required: true, description: 'العضو' }],
-    execute: async (ctx) => {
-      const member = await ctx.getUserMember('user');
-      if (!member) return ctx.reply('❌ لم يتم العثور على العضو.');
-      if (!member.voice.channel) return ctx.reply('❌ العضو ليس في روم صوتي.');
-      await member.voice.disconnect('طرد صوتي عبر الأمر');
-      return ctx.reply(`✅ تم طرد **${member.user.tag}** من الروم الصوتي.`);
+      return ctx.replySuccess(`تم طرد **${member.user.tag}** من السيرفر.`, [
+        { name: 'السبب', value: reason, inline: true }
+      ]);
     },
   },
   {
@@ -96,7 +118,7 @@ const commands = [
     permission: PermissionFlagsBits.ModerateMembers,
     options: [
       { name: 'user', type: 'user', required: true, description: 'العضو' },
-      { name: 'duration', type: 'string', required: true, description: 'المدة مثل 10m أو 2h أو 1d' },
+      { name: 'duration', type: 'string', required: true, description: 'المدة (مثال: 10m, 2h, 1d)' },
       { name: 'reason', type: 'string', required: false, consumeRest: true, description: 'السبب' },
     ],
     execute: async (ctx) => {
@@ -104,10 +126,14 @@ const commands = [
       const durationRaw = ctx.getString('duration');
       const reason = ctx.getString('reason') || 'لا يوجد سبب';
       const ms = parseDuration(durationRaw);
-      if (!member) return ctx.reply('❌ لم يتم العثور على العضو.');
-      if (!ms || ms <= 0 || ms > 28 * 86400000) return ctx.reply('❌ مدة غير صالحة (الحد الأقصى 28 يوم). مثال: 10m, 2h, 1d');
+      if (!member) return ctx.replyError('لم يتم العثور على العضو.');
+      if (!ms || ms <= 0 || ms > 28 * 86400000) return ctx.replyError('صيغة الوقت غير صحيحة. استخدم قيم مثل: `10m`, `2h`, `1d` (الحد الأقصى 28 يوماً).');
+      
       await member.timeout(ms, reason);
-      return ctx.reply(`✅ تم إسكات **${member.user.tag}** لمدة ${durationRaw}\nالسبب: ${reason}`);
+      return ctx.replySuccess(`تم تطبيق الإسكات المؤقت على **${member.user.tag}**.`, [
+        { name: 'المدة', value: durationRaw, inline: true },
+        { name: 'السبب', value: reason, inline: true }
+      ]);
     },
   },
   {
@@ -117,195 +143,116 @@ const commands = [
     options: [{ name: 'user', type: 'user', required: true, description: 'العضو' }],
     execute: async (ctx) => {
       const member = await ctx.getUserMember('user');
-      if (!member) return ctx.reply('❌ لم يتم العثور على العضو.');
+      if (!member) return ctx.replyError('لم يتم العثور على العضو.');
       await member.timeout(null);
-      return ctx.reply(`✅ تم إلغاء الإسكات عن **${member.user.tag}**.`);
+      return ctx.replySuccess(`تم إلغاء الإسكات المؤقت عن **${member.user.tag}**.`);
     },
   },
   {
-    name: 'mutetext',
-    description: 'كتم عضو عن الكتابة في جميع الرومات',
-    permission: PermissionFlagsBits.ModerateMembers,
-    options: [
-      { name: 'user', type: 'user', required: true, description: 'العضو' },
-      { name: 'reason', type: 'string', required: false, consumeRest: true, description: 'السبب' },
-    ],
+    name: 'clear',
+    description: 'حذف عدد محدد من الرسائل',
+    permission: PermissionFlagsBits.ManageMessages,
+    options: [{ name: 'amount', type: 'integer', required: true, description: 'عدد الرسائل المراد مسحها (1-100)' }],
     execute: async (ctx) => {
-      const member = await ctx.getUserMember('user');
-      const reason = ctx.getString('reason') || 'لا يوجد سبب';
-      if (!member) return ctx.reply('❌ لم يتم العثور على العضو.');
-      const role = await ensureMutedRole(ctx.guild);
-      await member.roles.add(role, reason);
-      return ctx.reply(`✅ تم كتم **${member.user.tag}** عن الكتابة.\nالسبب: ${reason}`);
-    },
-  },
-  {
-    name: 'unmutetext',
-    description: 'إلغاء كتم الكتابة عن عضو',
-    permission: PermissionFlagsBits.ModerateMembers,
-    options: [{ name: 'user', type: 'user', required: true, description: 'العضو' }],
-    execute: async (ctx) => {
-      const member = await ctx.getUserMember('user');
-      if (!member) return ctx.reply('❌ لم يتم العثور على العضو.');
-      const role = await ensureMutedRole(ctx.guild);
-      await member.roles.remove(role);
-      return ctx.reply(`✅ تم إلغاء كتم الكتابة عن **${member.user.tag}**.`);
-    },
-  },
-  {
-    name: 'mutevoice',
-    description: 'كتم صوت عضو في الروم الصوتي',
-    permission: PermissionFlagsBits.MuteMembers,
-    options: [{ name: 'user', type: 'user', required: true, description: 'العضو' }],
-    execute: async (ctx) => {
-      const member = await ctx.getUserMember('user');
-      if (!member) return ctx.reply('❌ لم يتم العثور على العضو.');
-      if (!member.voice.channel) return ctx.reply('❌ العضو ليس في روم صوتي.');
-      await member.voice.setMute(true, 'كتم صوتي عبر الأمر');
-      return ctx.reply(`✅ تم كتم صوت **${member.user.tag}**.`);
-    },
-  },
-  {
-    name: 'unmutevoice',
-    description: 'إلغاء كتم صوت عضو',
-    permission: PermissionFlagsBits.MuteMembers,
-    options: [{ name: 'user', type: 'user', required: true, description: 'العضو' }],
-    execute: async (ctx) => {
-      const member = await ctx.getUserMember('user');
-      if (!member) return ctx.reply('❌ لم يتم العثور على العضو.');
-      await member.voice.setMute(false, 'إلغاء كتم صوتي عبر الأمر');
-      return ctx.reply(`✅ تم إلغاء كتم صوت **${member.user.tag}**.`);
+      let amount = ctx.getInteger('amount');
+      if (!amount || amount < 1 || amount > 100) return ctx.replyError('يرجى إدخال عدد رسائل صحيح بين 1 و 100.');
+      
+      const deleted = await ctx.channel.bulkDelete(amount, true);
+      const resEmbed = createEmbed('🧹 مسح الرسائل', `تم مسح **${deleted.size}** رسالة بنجاح.`, '#5865F2');
+      const msg = await ctx.replyEmbed(resEmbed);
+      if (!ctx.isSlash && msg && msg.delete) setTimeout(() => msg.delete().catch(() => {}), 4000);
     },
   },
   {
     name: 'warn',
-    description: 'إضافة تحذير لعضو',
+    description: 'إضافة تحذير لإدارة المخالفات',
     permission: PermissionFlagsBits.ModerateMembers,
     options: [
-      { name: 'user', type: 'user', required: true, description: 'العضو' },
+      { name: 'user', type: 'user', required: true, description: 'العضو المخالف' },
       { name: 'reason', type: 'string', required: true, consumeRest: true, description: 'سبب التحذير' },
     ],
     execute: async (ctx) => {
       const member = await ctx.getUserMember('user');
       const reason = ctx.getString('reason');
-      if (!member) return ctx.reply('❌ لم يتم العثور على العضو.');
-      if (!reason) return ctx.reply('❌ يجب كتابة سبب التحذير.');
+      if (!member) return ctx.replyError('لم يتم العثور على العضو.');
+      if (!reason) return ctx.replyError('يجب كتابة سبب التحذير.');
       const warning = addWarning(ctx.guild.id, member.id, reason, ctx.invoker.id);
-      return ctx.reply(`⚠️ تم تحذير **${member.user.tag}**\nالسبب: ${reason}\nمعرّف التحذير: \`${warning.id}\``);
+      return ctx.replySuccess(`تم تحذير العضو **${member.user.tag}**`, [
+        { name: 'معرف التحذير (ID)', value: `\`${warning.id}\``, inline: true },
+        { name: 'السبب', value: reason, inline: true }
+      ]);
     },
   },
   {
     name: 'warn_remove',
-    description: 'حذف تحذير معين من عضو',
+    description: 'حذف تحذير سابق عن عضو',
     permission: PermissionFlagsBits.ModerateMembers,
     options: [
       { name: 'user', type: 'user', required: true, description: 'العضو' },
-      { name: 'warn_id', type: 'string', required: true, description: 'معرّف التحذير' },
+      { name: 'warn_id', type: 'string', required: true, description: 'معرف التحذير' },
     ],
     execute: async (ctx) => {
       const member = await ctx.getUserMember('user');
       const warnId = ctx.getString('warn_id');
-      if (!member) return ctx.reply('❌ لم يتم العثور على العضو.');
+      if (!member) return ctx.replyError('لم يتم العثور على العضو.');
       const removed = removeWarning(ctx.guild.id, member.id, warnId);
-      if (!removed) return ctx.reply('❌ لم يتم العثور على تحذير بهذا المعرّف.');
-      return ctx.reply(`✅ تم حذف التحذير \`${warnId}\` من **${member.user.tag}**.`);
+      if (!removed) return ctx.replyError('لم يتم العثور على تحذير مطابق لهذا المعرّف.');
+      return ctx.replySuccess(`تم حذف التحذير \`${warnId}\` من العضو **${member.user.tag}**.`);
     },
   },
   {
     name: 'warnings',
-    description: 'عرض تحذيرات عضو',
+    description: 'عرض قائمة تحذيرات العضو',
     permission: PermissionFlagsBits.ModerateMembers,
     options: [{ name: 'user', type: 'user', required: true, description: 'العضو' }],
     execute: async (ctx) => {
       const member = await ctx.getUserMember('user');
-      if (!member) return ctx.reply('❌ لم يتم العثور على العضو.');
+      if (!member) return ctx.replyError('لم يتم العثور على العضو.');
       const warns = getWarnings(ctx.guild.id, member.id);
-      if (!warns.length) return ctx.reply(`✅ لا يوجد تحذيرات لـ **${member.user.tag}**.`);
-      const list = warns.map((w, i) => `**${i + 1}.** \`${w.id}\` - ${w.reason} (بواسطة <@${w.moderatorId}>)`).join('\n');
-      return ctx.reply(`⚠️ تحذيرات **${member.user.tag}** (${warns.length}):\n${list}`);
-    },
-  },
-  {
-    name: 'clear',
-    description: 'حذف عدد من الرسائل',
-    permission: PermissionFlagsBits.ManageMessages,
-    options: [{ name: 'amount', type: 'integer', required: true, description: 'عدد الرسائل (1-100)' }],
-    execute: async (ctx) => {
-      let amount = ctx.getInteger('amount');
-      if (!amount || amount < 1) return ctx.reply('❌ أدخل عدداً صحيحاً بين 1 و100.');
-      if (amount > 100) amount = 100;
-      const deleted = await ctx.channel.bulkDelete(amount, true);
-      const msg = await ctx.reply(`✅ تم حذف ${deleted.size} رسالة.`);
-      if (!ctx.isSlash && msg && msg.delete) setTimeout(() => msg.delete().catch(() => {}), 4000);
-    },
-  },
-  {
-    name: 'setnick',
-    description: 'تغيير اسم عضو',
-    permission: PermissionFlagsBits.ManageNicknames,
-    options: [
-      { name: 'user', type: 'user', required: true, description: 'العضو' },
-      { name: 'nickname', type: 'string', required: true, consumeRest: true, description: 'الاسم الجديد' },
-    ],
-    execute: async (ctx) => {
-      const member = await ctx.getUserMember('user');
-      const nickname = ctx.getString('nickname');
-      if (!member) return ctx.reply('❌ لم يتم العثور على العضو.');
-      if (!nickname) return ctx.reply('❌ يجب كتابة الاسم الجديد.');
-      if (!member.manageable) return ctx.reply('❌ لا يمكنني تعديل اسم هذا العضو.');
-      await member.setNickname(nickname);
-      return ctx.reply(`✅ تم تغيير اسم **${member.user.tag}** إلى **${nickname}**.`);
-    },
-  },
-  {
-    name: 'points',
-    description: 'نظام نقاط الأعضاء (إضافة/خصم/عرض)',
-    permission: PermissionFlagsBits.ManageGuild,
-    options: [
-      { name: 'action', type: 'string', required: true, description: 'add / remove / show' },
-      { name: 'user', type: 'user', required: true, description: 'العضو' },
-      { name: 'amount', type: 'integer', required: false, description: 'عدد النقاط' },
-    ],
-    execute: async (ctx) => {
-      const action = (ctx.getString('action') || '').toLowerCase();
-      const member = await ctx.getUserMember('user');
-      const amount = ctx.getInteger('amount') || 0;
-      if (!member) return ctx.reply('❌ لم يتم العثور على العضو.');
-      if (action === 'add') {
-        const total = addPoints(ctx.guild.id, member.id, Math.abs(amount));
-        return ctx.reply(`✅ تم إضافة ${Math.abs(amount)} نقطة لـ **${member.user.tag}**. الرصيد الحالي: ${total}`);
-      }
-      if (action === 'remove') {
-        const total = addPoints(ctx.guild.id, member.id, -Math.abs(amount));
-        return ctx.reply(`✅ تم خصم ${Math.abs(amount)} نقطة من **${member.user.tag}**. الرصيد الحالي: ${total}`);
-      }
-      if (action === 'show') {
-        const total = getPoints(ctx.guild.id, member.id);
-        return ctx.reply(`📊 رصيد **${member.user.tag}**: ${total} نقطة.`);
-      }
-      return ctx.reply('❌ الإجراء غير صالح، استخدم: add / remove / show');
+      if (!warns.length) return ctx.replySuccess(`لا يوجد أي تحذيرات مسجلة على **${member.user.tag}**.`);
+      const list = warns.map((w, i) => `**${i + 1}.** \`${w.id}\` — ${w.reason} (بواسطة <@${w.moderatorId}>)`).join('\n');
+      const embed = createEmbed(`⚠️ سجل تحذيرات ${member.user.username}`, list, '#FEE75C');
+      return ctx.replyEmbed(embed);
     },
   },
   {
     name: 'lock',
-    description: 'قفل الروم الحالي',
+    description: 'قفل القناة الحالية أمام الكتابة',
     permission: PermissionFlagsBits.ManageChannels,
-    options: [{ name: 'channel', type: 'channel', required: false, description: 'الروم (اختياري)' }],
+    options: [{ name: 'channel', type: 'channel', required: false, description: 'القناة' }],
     execute: async (ctx) => {
       const channel = ctx.getChannel('channel') || ctx.channel;
       await channel.permissionOverwrites.edit(ctx.guild.roles.everyone, { SendMessages: false });
-      return ctx.reply(`🔒 تم قفل الروم ${channel}.`);
+      return ctx.replySuccess(`🔒 تم قفل القناة ${channel} بنجاح.`);
     },
   },
   {
     name: 'unlock',
-    description: 'فتح الروم الحالي',
+    description: 'فتح القناة الحالية للجميع',
     permission: PermissionFlagsBits.ManageChannels,
-    options: [{ name: 'channel', type: 'channel', required: false, description: 'الروم (اختياري)' }],
+    options: [{ name: 'channel', type: 'channel', required: false, description: 'القناة' }],
     execute: async (ctx) => {
       const channel = ctx.getChannel('channel') || ctx.channel;
       await channel.permissionOverwrites.edit(ctx.guild.roles.everyone, { SendMessages: true });
-      return ctx.reply(`🔓 تم فتح الروم ${channel}.`);
+      return ctx.replySuccess(`🔓 تم فتح القناة ${channel} بنجاح.`);
+    },
+  },
+  {
+    name: 'setnick',
+    description: 'تغيير لقب عضو في السيرفر',
+    permission: PermissionFlagsBits.ManageNicknames,
+    options: [
+      { name: 'user', type: 'user', required: true, description: 'العضو' },
+      { name: 'nickname', type: 'string', required: true, consumeRest: true, description: 'اللقب الجديد' },
+    ],
+    execute: async (ctx) => {
+      const member = await ctx.getUserMember('user');
+      const nickname = ctx.getString('nickname');
+      if (!member) return ctx.replyError('لم يتم العثور على العضو.');
+      if (!nickname) return ctx.replyError('يرجى تحديد اللقب الجديد.');
+      if (!member.manageable) return ctx.replyError('لا يمكنني تغيير لقب هذا العضو بسبب رتبته.');
+      await member.setNickname(nickname);
+      return ctx.replySuccess(`🏷️ تم تغيير لقب **${member.user.tag}** إلى **${nickname}** بنجاح.`);
     },
   },
   {
@@ -319,49 +266,32 @@ const commands = [
     execute: async (ctx) => {
       const member = await ctx.getUserMember('user');
       const role = ctx.getRole('role');
-      if (!member) return ctx.reply('❌ لم يتم العثور على العضو.');
-      if (!role) return ctx.reply('❌ لم يتم العثور على الرتبة.');
+      if (!member) return ctx.replyError('لم يتم العثور على العضو.');
+      if (!role) return ctx.replyError('لم يتم العثور على الرتبة المحدد.');
       if (member.roles.cache.has(role.id)) {
         await member.roles.remove(role);
-        return ctx.reply(`✅ تم إزالة رتبة **${role.name}** من **${member.user.tag}**.`);
+        return ctx.replySuccess(`تم سحب رتبة **${role.name}** من **${member.user.tag}**.`);
       }
       await member.roles.add(role);
-      return ctx.reply(`✅ تم إضافة رتبة **${role.name}** لـ **${member.user.tag}**.`);
-    },
-  },
-  {
-    name: 'setcolor',
-    description: 'تغيير لون رتبة',
-    permission: PermissionFlagsBits.ManageRoles,
-    options: [
-      { name: 'role', type: 'role', required: true, description: 'الرتبة' },
-      { name: 'color', type: 'string', required: true, description: 'اللون بصيغة HEX مثل #ff0000' },
-    ],
-    execute: async (ctx) => {
-      const role = ctx.getRole('role');
-      const color = ctx.getString('color');
-      if (!role) return ctx.reply('❌ لم يتم العثور على الرتبة.');
-      if (!color || !/^#?[0-9a-fA-F]{6}$/.test(color)) return ctx.reply('❌ صيغة اللون غير صحيحة، استخدم مثل #ff0000');
-      await role.setColor(color.startsWith('#') ? color : `#${color}`);
-      return ctx.reply(`🎨 تم تغيير لون رتبة **${role.name}**.`);
+      return ctx.replySuccess(`تم إعطاء رتبة **${role.name}** لـ **${member.user.tag}**.`);
     },
   },
   {
     name: 'slowmode',
-    description: 'تحديد وضع البطيء للروم',
+    description: 'ضبط الوضع البطيء للقناة',
     permission: PermissionFlagsBits.ManageChannels,
     options: [
-      { name: 'seconds', type: 'integer', required: true, description: 'عدد الثواني (0 للإيقاف)' },
-      { name: 'channel', type: 'channel', required: false, description: 'الروم (اختياري)' },
+      { name: 'seconds', type: 'integer', required: true, description: 'عدد الثواني (0 للإلغاء)' },
+      { name: 'channel', type: 'channel', required: false, description: 'القناة' },
     ],
     execute: async (ctx) => {
       const seconds = ctx.getInteger('seconds');
       const channel = ctx.getChannel('channel') || ctx.channel;
-      if (seconds === null || seconds < 0 || seconds > 21600) return ctx.reply('❌ القيمة يجب أن تكون بين 0 و21600 ثانية.');
+      if (seconds === null || seconds < 0 || seconds > 21600) return ctx.replyError('المدة يجب أن تكون بين 0 و 21600 ثانية.');
       await channel.setRateLimitPerUser(seconds);
-      return ctx.reply(seconds === 0 ? `✅ تم إيقاف وضع البطيء في ${channel}.` : `🐢 تم ضبط وضع البطيء على ${seconds} ثانية في ${channel}.`);
+      return ctx.replySuccess(seconds === 0 ? `تم إيقاف وضع البطيء في ${channel}.` : `🐢 تم ضبط الوضع البطيء إلى **${seconds} ثانية** في ${channel}.`);
     },
-  },
+  }
 ];
 
-module.exports = { commands, ensureMutedRole };
+module.exports = { commands, createEmbed, ensureMutedRole };
