@@ -6,24 +6,15 @@ function buildMainEmbed(client) {
     .setDescription(
       '> **مرحباً بك في لوحة تحكم OS.**\n' +
       '> اختر القسم المطلوب من القائمة بالأسفل.\n\n' +
-      '✈️ ` /ban `\n' +
-      '> حظر عضو من السيرفر\n\n' +
-      '🔓 ` /unban `\n' +
-      '> فك الحظر بواسطة ID\n\n' +
-      '🧹 ` /clear `\n' +
-      '> مسح عدد من الرسائل\n\n' +
-      '🔒 ` /lock `\n' +
-      '> قفل القناة الحالية\n\n' +
-      '🔓 ` /unlock `\n' +
-      '> فتح القناة الحالية\n\n' +
-      '🔇 ` /mute `\n' +
-      '> إعطاء ميوت للمستخدم\n\n' +
-      '🔊 ` /unmute `\n' +
-      '> فك الميوت عن المستخدم\n\n' +
-      '🏷️ ` /setnick `\n' +
-      '> تغيير لقب المستخدم\n\n' +
-      '⚙️ ` /help `\n' +
-      '> عرض قائمة المساعدة'
+      '✈️ ` /ban `\n> حظر عضو من السيرفر\n\n' +
+      '🔓 ` /unban `\n> فك الحظر بواسطة ID\n\n' +
+      '🧹 ` /clear `\n> مسح عدد من الرسائل\n\n' +
+      '🔒 ` /lock `\n> قفل القناة الحالية\n\n' +
+      '🔓 ` /unlock `\n> فتح القناة الحالية\n\n' +
+      '🔇 ` /mute `\n> إعطاء ميوت للمستخدم\n\n' +
+      '🔊 ` /unmute `\n> فك الميوت عن المستخدم\n\n' +
+      '🏷️ ` /setnick `\n> تغيير لقب المستخدم\n\n' +
+      '⚙️ ` /help `\n> عرض قائمة المساعدة'
     )
     .setColor('#2b2d31')
     .setThumbnail(client.user.displayAvatarURL())
@@ -45,8 +36,6 @@ function buildMenuRow() {
 module.exports = {
   name: 'help',
   aliases: ['م', 'مساعدة'],
-  description: 'عرض قائمة المساعدة',
-
   async execute(message) {
     const client = message.client;
     const mainEmbed = buildMainEmbed(client);
@@ -54,14 +43,12 @@ module.exports = {
 
     const replyMsg = await message.reply({ embeds: [mainEmbed], components: [row] });
 
-    // تحديد المجمع بحيث ينتهي ويمنع التكرار
     const collector = replyMsg.createMessageComponentCollector({
       componentType: ComponentType.StringSelect,
       time: 60000
     });
 
     collector.on('collect', async i => {
-      // التأكد من أن صاحب الأمر فقط هو من يتفاعل
       if (i.user.id !== message.author.id) {
         return i.reply({ content: 'عذراً، هذه القائمة خاصة بكاتب الأمر فقط!', ephemeral: true });
       }
@@ -90,12 +77,7 @@ module.exports = {
         );
       }
 
-      // التعديل المباشر لمنع تكرار الرسائل
       await i.update({ embeds: [newEmbed], components: [row] });
-    });
-
-    collector.on('end', () => {
-      replyMsg.edit({ components: [] }).catch(() => {});
     });
   }
 };
