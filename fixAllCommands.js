@@ -1,9 +1,13 @@
-const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder, ComponentType } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
+
+// 1. تحديث ملف help.js ليكتب استجابة موحدة ومضمونة
+const helpContent = `const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder, ComponentType } = require('discord.js');
 
 function getHelpData() {
   const embed = new EmbedBuilder()
     .setTitle('⚡ OS System — Control Center')
-    .setDescription('> **مرحباً بك في لوحة تحكم OS.**\n> اختر القسم المطلوب من القائمة بالأسفل.')
+    .setDescription('> **مرحباً بك في لوحة تحكم OS.**\\n> اختر القسم المطلوب من القائمة بالأسفل.')
     .addFields(
       { name: '✈️ ban', value: 'حظر عضو من السيرفر' },
       { name: '🔓 unban', value: 'فك الحظر بواسطة ID' },
@@ -66,3 +70,10 @@ module.exports = {
     await interaction.reply(data);
   }
 };
+`;
+
+fs.writeFileSync('help.js', helpContent);
+if (fs.existsSync('src/commands')) fs.writeFileSync('src/commands/help.js', helpContent);
+if (fs.existsSync('commands')) fs.writeFileSync('commands/help.js', helpContent);
+
+console.log('✅ Updated help.js file successfully.');
