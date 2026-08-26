@@ -6,15 +6,15 @@ function buildMainEmbed(client) {
     .setDescription(
       '> **مرحباً بك في لوحة تحكم OS.**\n' +
       '> اختر القسم المطلوب من القائمة بالأسفل.\n\n' +
-      '✈️ ` /ban `\n> حظر عضو من السيرفر\n\n' +
-      '🔓 ` /unban `\n> فك الحظر بواسطة ID\n\n' +
-      '🧹 ` /clear `\n> مسح عدد من الرسائل\n\n' +
-      '🔒 ` /lock `\n> قفل القناة الحالية\n\n' +
-      '🔓 ` /unlock `\n> فتح القناة الحالية\n\n' +
-      '🔇 ` /mute `\n> إعطاء ميوت للمستخدم\n\n' +
-      '🔊 ` /unmute `\n> فك الميوت عن المستخدم\n\n' +
-      '🏷️ ` /setnick `\n> تغيير لقب المستخدم\n\n' +
-      '⚙️ ` /help `\n> عرض قائمة المساعدة'
+      '✈️ ` -ban `\n> حظر عضو من السيرفر\n\n' +
+      '🔓 ` -unban `\n> فك الحظر بواسطة ID\n\n' +
+      '🧹 ` -clear `\n> مسح عدد من الرسائل\n\n' +
+      '🔒 ` -lock `\n> قفل القناة الحالية\n\n' +
+      '🔓 ` -unlock `\n> فتح القناة الحالية\n\n' +
+      '🔇 ` -mute `\n> إعطاء ميوت للمستخدم\n\n' +
+      '🔊 ` -unmute `\n> فك الميوت عن المستخدم\n\n' +
+      '🏷️ ` -setnick `\n> تغيير لقب المستخدم\n\n' +
+      '⚙️ ` -help `\n> عرض قائمة المساعدة'
     )
     .setColor('#2b2d31')
     .setThumbnail(client.user.displayAvatarURL())
@@ -35,13 +35,18 @@ function buildMenuRow() {
 
 module.exports = {
   name: 'help',
-  aliases: ['م', 'مساعدة'],
+  aliases: ['مساعدة'],
   async execute(message) {
     const client = message.client;
     const mainEmbed = buildMainEmbed(client);
     const row = buildMenuRow();
 
-    const replyMsg = await message.reply({ embeds: [mainEmbed], components: [row] });
+    // إرسال رد بدون منشن بدون شريط أصفر (allowedMentions)
+    const replyMsg = await message.channel.send({
+      embeds: [mainEmbed],
+      components: [row],
+      allowedMentions: { repliedUser: false }
+    });
 
     const collector = replyMsg.createMessageComponentCollector({
       componentType: ComponentType.StringSelect,
@@ -61,19 +66,19 @@ module.exports = {
 
       if (selected === 'mod_category') {
         newEmbed.setTitle('🛡️ أوامر الإدارة').setDescription(
-          '✈️ ` /ban `\n> حظر عضو من السيرفر\n\n' +
-          '🔓 ` /unban `\n> فك الحظر بواسطة ID\n\n' +
-          '🧹 ` /clear `\n> مسح عدد من الرسائل\n\n' +
-          '🔒 ` /lock `\n> قفل القناة الحالية\n\n' +
-          '🔓 ` /unlock `\n> فتح القناة الحالية\n\n' +
-          '🔇 ` /mute `\n> إعطاء ميوت للمستخدم\n\n' +
-          '🔊 ` /unmute `\n> فك الميوت عن المستخدم\n\n' +
-          '🏷️ ` /setnick `\n> تغيير لقب المستخدم'
+          '✈️ ` -ban `\n> حظر عضو من السيرفر\n\n' +
+          '🔓 ` -unban `\n> فك الحظر بواسطة ID\n\n' +
+          '🧹 ` -clear `\n> مسح عدد من الرسائل\n\n' +
+          '🔒 ` -lock `\n> قفل القناة الحالية\n\n' +
+          '🔓 ` -unlock `\n> فتح القناة الحالية\n\n' +
+          '🔇 ` -mute `\n> إعطاء ميوت للمستخدم\n\n' +
+          '🔊 ` -unmute `\n> فك الميوت عن المستخدم\n\n' +
+          '🏷️ ` -setnick `\n> تغيير لقب المستخدم'
         );
       } else if (selected === 'general_category') {
         newEmbed.setTitle('🌐 الأوامر العامة').setDescription(
-          '⚙️ ` /help `\n> عرض قائمة المساعدة\n\n' +
-          '📊 ` /info `\n> عرض إحصائيات السيرفر'
+          '⚙️ ` -help `\n> عرض قائمة المساعدة\n\n' +
+          '📊 ` -info `\n> عرض إحصائيات السيرفر'
         );
       }
 

@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Partials } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, EmbedBuilder } = require('discord.js');
 const helpCmd = require('./help.js');
 
 const client = new Client({
@@ -14,11 +14,22 @@ const client = new Client({
 const PREFIX = '-';
 
 client.once('ready', () => {
-  console.log(`✅ Bot live: ${client.user.tag}`);
+  console.log(`✅ Probot Style Engine active as ${client.user.tag}`);
 });
 
 client.on('messageCreate', async (message) => {
   if (message.author.bot || !message.guild) return;
+
+  // 1. الاستجابة لمنشن البوت (Ping Bot)
+  if (message.content.trim() === `<@${client.user.id}>` || message.content.trim() === `<@!${client.user.id}>`) {
+    const pingEmbed = new EmbedBuilder()
+      .setTitle('🤖 OS System Engine')
+      .setDescription(`> **Prefix الحالي للبرنامج هو:** \`${PREFIX}\`\n> اكتب \`${PREFIX}help\` لفتح قائمة المساعدة والمزيد من المعلومات.`)
+      .setColor('#2b2d31')
+      .setFooter({ text: 'OS System Engine', iconURL: client.user.displayAvatarURL() });
+
+    return message.channel.send({ embeds: [pingEmbed], allowedMentions: { repliedUser: false } });
+  }
 
   const content = message.content.trim();
   let cmd = '';
@@ -29,7 +40,8 @@ client.on('messageCreate', async (message) => {
     cmd = content.split(/ +/)[0].toLowerCase();
   }
 
-  if (cmd === 'help' || cmd === 'م' || cmd === 'مساعدة') {
+  // 2. تنفيذ أمر المساعدة بدون اختصار "م"
+  if (cmd === 'help' || cmd === 'مساعدة') {
     try {
       await helpCmd.execute(message);
     } catch (err) {
