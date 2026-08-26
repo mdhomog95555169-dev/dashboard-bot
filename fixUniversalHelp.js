@@ -1,9 +1,12 @@
-const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder, ComponentType } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
+
+const helpContent = `const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder, ComponentType } = require('discord.js');
 
 function createHelpEmbed() {
   return new EmbedBuilder()
     .setTitle('⚡ OS System — Control Center')
-    .setDescription('> **مرحباً بك في لوحة تحكم OS.**\n> اختر القسم المطلوب من القائمة بالأسفل.')
+    .setDescription('> **مرحباً بك في لوحة تحكم OS.**\\n> اختر القسم المطلوب من القائمة بالأسفل.')
     .addFields(
       { name: '✈️ /ban', value: 'حظر عضو من السيرفر' },
       { name: '🔓 /unban', value: 'فك الحظر بواسطة ID' },
@@ -97,3 +100,12 @@ module.exports = {
     });
   }
 };
+`;
+
+const targetDirs = ['src/commands', 'commands', 'src/cmds'];
+targetDirs.forEach(dir => {
+  if (fs.existsSync(dir)) fs.writeFileSync(path.join(dir, 'help.js'), helpContent);
+});
+fs.writeFileSync('help.js', helpContent);
+
+console.log('✅ Created fixUniversalHelp.js');
