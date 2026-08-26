@@ -1,52 +1,71 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Partials, EmbedBuilder } = require('discord.js');
-const helpCmd = require('./help.js');
+const { Client, GatewayIntentBits, Partials, REST, Routes, SlashCommandBuilder } = require('discord.js');
+const handler = require('./commandsHandler.js');
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildVoiceStates
   ],
   partials: [Partials.Channel, Partials.Message]
 });
 
 const PREFIX = '-';
 
-client.once('ready', () => {
-  console.log(`✅ Probot Style Engine active as ${client.user.tag}`);
+// تسجل الأوامر في Slash Commands
+async function registerSlashCommands() {
+  const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN || process.env.BOT_TOKEN);
+  const slashData = handler.commandsList.map(cmd => 
+    new SlashCommandBuilder().setName(cmd.name).setDescription(cmd.desc)
+  );
+
+  try {
+    console.log('🔄 Registering Slash Commands...');
+    await rest.put(
+      Routes.applicationCommands(client.user.id),
+      { body: slashData }
+    );
+    console.log('✅ Slash Commands registered successfully.');
+  } catch (err) {
+    console.error('Error registering slash commands:', err);
+  }
+}
+
+client.once('ready', async () => {
+  console.log(`✅ Bot ready as ${client.user.tag}`);
+  await registerSlashCommands();
 });
 
+// التعامل مع Slash Commands
+client.on('interactionCreate', async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+  await handler.runCommand(interaction.commandName, interaction, []);
+});
+
+// التعامل مع Prefix و Prefix-less
 client.on('messageCreate', async (message) => {
   if (message.author.bot || !message.guild) return;
 
-  // 1. الاستجابة لمنشن البوت (Ping Bot)
-  if (message.content.trim() === `<@${client.user.id}>` || message.content.trim() === `<@!${client.user.id}>`) {
-    const pingEmbed = new EmbedBuilder()
-      .setTitle('🤖 OS System Engine')
-      .setDescription(`> **Prefix الحالي للبرنامج هو:** \`${PREFIX}\`\n> اكتب \`${PREFIX}help\` لفتح قائمة المساعدة والمزيد من المعلومات.`)
-      .setColor('#2b2d31')
-      .setFooter({ text: 'OS System Engine', iconURL: client.user.displayAvatarURL() });
-
-    return message.channel.send({ embeds: [pingEmbed], allowedMentions: { repliedUser: false } });
-  }
-
   const content = message.content.trim();
-  let cmd = '';
+  let cmdName = '';
+  let args = [];
 
   if (content.startsWith(PREFIX)) {
-    cmd = content.slice(PREFIX.length).trim().split(/ +/)[0].toLowerCase();
+    const split = content.slice(PREFIX.length).trim().split(/ +/);
+    cmdName = split[0].toLowerCase();
+    args = split.slice(1);
   } else {
-    cmd = content.split(/ +/)[0].toLowerCase();
+    const split = content.trim().split(/ +/);
+    cmdName = split[0].toLowerCase();
+    args = split.slice(1);
   }
 
-  // 2. تنفيذ أمر المساعدة بدون اختصار "م"
-  if (cmd === 'help' || cmd === 'مساعدة') {
-    try {
-      await helpCmd.execute(message);
-    } catch (err) {
-      console.error(err);
-    }
+  // التأكد من أن الأمر موجود في قائمة الأوامر المعتمدة
+  const matchedCmd = handler.commandsList.find(c => c.name === cmdName);
+  if (matchedCmd) {
+    await handler.runCommand(matchedCmd.name, message, args);
   }
 });
 
