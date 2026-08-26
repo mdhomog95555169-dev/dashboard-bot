@@ -1,4 +1,6 @@
-require('dotenv').config();
+const fs = require('fs');
+
+const mainBotCode = `require('dotenv').config();
 const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const helpCmd = require('./help.js');
 
@@ -15,7 +17,7 @@ const client = new Client({
 const PREFIX = '-';
 
 client.once('ready', () => {
-  console.log(`✅ Logged in as ${client.user.tag} (Pure Prefix & Text Mode)`);
+  console.log(\`✅ Logged in as \${client.user.tag} (Pure Prefix & Text Mode)\`);
 });
 
 // معالج الأوامر النصية والبريفكس والاختصارات
@@ -41,3 +43,7 @@ client.on('messageCreate', async (message) => {
 });
 
 client.login(process.env.DISCORD_TOKEN || process.env.BOT_TOKEN);
+`;
+
+fs.writeFileSync('bot.js', mainBotCode);
+console.log('✅ Converted bot to pure text and prefix mode to prevent interaction timeouts.');
