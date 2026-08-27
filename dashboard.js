@@ -62,6 +62,7 @@ function layout(title, body, extraHead = '') {
   @keyframes fadeUp { from{opacity:0; transform:translateY(24px)} to{opacity:1; transform:translateY(0)} }
   .card-hover { transition: all .3s ease; }
   .card-hover:hover { transform: translateY(-6px); border-color: rgba(129,140,248,0.5); box-shadow: 0 10px 40px rgba(99,102,241,.25); }
+  .step-line { background: linear-gradient(90deg, rgba(129,140,248,.5), rgba(167,139,250,.5)); }
   ::-webkit-scrollbar { width: 8px; } ::-webkit-scrollbar-thumb { background: rgba(129,140,248,0.4); border-radius: 10px; }
 </style>
 ${extraHead}
@@ -72,9 +73,9 @@ ${body}
 </html>`;
 }
 
-function landingPage() {
+function landingPage(stats) {
   return layout('OS System Engine | OSCORP RP', `
-  <div class="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden">
+  <div class="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden py-16">
     <div class="absolute top-1/4 -left-20 w-72 h-72 bg-indigo-600/20 rounded-full blur-3xl float"></div>
     <div class="absolute bottom-1/4 -right-20 w-72 h-72 bg-purple-600/20 rounded-full blur-3xl float" style="animation-delay:2s"></div>
 
@@ -95,18 +96,46 @@ function landingPage() {
       </div>
     </div>
 
-    <div class="relative z-10 mt-20 grid grid-cols-1 sm:grid-cols-3 gap-5 max-w-3xl w-full fade-up" style="animation-delay:.2s">
-      <div class="glass card-hover rounded-2xl p-6 text-center">
-        <div class="text-3xl mb-3">🛡️</div><div class="font-bold text-lg mb-1">حماية تلقائية</div>
-        <p class="text-gray-500 text-sm">مكافحة السبام والروابط والكلمات المحظورة</p>
-      </div>
-      <div class="glass card-hover rounded-2xl p-6 text-center">
-        <div class="text-3xl mb-3">🎟️</div><div class="font-bold text-lg mb-1">نظام تذاكر</div>
-        <p class="text-gray-500 text-sm">دعم فني احترافي بأزرار تفاعلية</p>
-      </div>
-      <div class="glass card-hover rounded-2xl p-6 text-center">
-        <div class="text-3xl mb-3">⚙️</div><div class="font-bold text-lg mb-1">تحكم كامل</div>
-        <p class="text-gray-500 text-sm">25+ أمر إداري بصلاحيات دقيقة</p>
+    <div class="relative z-10 mt-16 max-w-4xl w-full fade-up" style="animation-delay:.15s">
+      <div class="glass rounded-3xl p-8 md:p-10">
+        <div class="text-center mb-8">
+          <h2 class="text-2xl md:text-3xl font-black gradient-text mb-2">أهلاً بك في OS System Engine</h2>
+          <p class="text-gray-400">محرك إدارة متكامل يعمل على مدار الساعة لخدمة مجتمعك</p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+          <div class="text-center rounded-2xl bg-white/5 border border-white/10 py-5">
+            <div class="text-3xl font-black text-indigo-300">${stats.guildCount}</div>
+            <div class="text-sm text-gray-500 mt-1">سيرفر يثق بنا</div>
+          </div>
+          <div class="text-center rounded-2xl bg-white/5 border border-white/10 py-5">
+            <div class="text-3xl font-black text-purple-300">99.9%</div>
+            <div class="text-sm text-gray-500 mt-1">نسبة التشغيل</div>
+          </div>
+          <div class="text-center rounded-2xl bg-white/5 border border-white/10 py-5">
+            <div class="text-3xl font-black text-blue-300">${stats.ping}ms</div>
+            <div class="text-sm text-gray-500 mt-1">سرعة الاستجابة</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 relative">
+          <div class="hidden sm:block absolute top-6 left-[16.6%] right-[16.6%] h-0.5 step-line"></div>
+          <div class="relative text-center">
+            <div class="w-12 h-12 mx-auto rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center font-black text-lg mb-3 glow-btn">1</div>
+            <div class="font-bold mb-1">سجّل الدخول</div>
+            <p class="text-gray-500 text-sm">بحسابك في Discord بأمان عبر OAuth2</p>
+          </div>
+          <div class="relative text-center">
+            <div class="w-12 h-12 mx-auto rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center font-black text-lg mb-3 glow-btn">2</div>
+            <div class="font-bold mb-1">اختر سيرفرك</div>
+            <p class="text-gray-500 text-sm">من قائمة السيرفرات التي تديرها</p>
+          </div>
+          <div class="relative text-center">
+            <div class="w-12 h-12 mx-auto rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center font-black text-lg mb-3 glow-btn">3</div>
+            <div class="font-bold mb-1">اضبط الإعدادات</div>
+            <p class="text-gray-500 text-sm">فعّل الحماية وخصص البوت لمجتمعك</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>`);
@@ -176,7 +205,7 @@ function manageGuildPage(guildId, guildName, automod) {
   </div>`);
 }
 
-function createApp() {
+function createApp(client) {
   const app = express();
   app.set('trust proxy', 1);
   app.use(session({
@@ -186,9 +215,15 @@ function createApp() {
     cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 1000 * 60 * 60 * 6 },
   }));
 
+  function getStats() {
+    const guildCount = client?.guilds?.cache?.size ?? 0;
+    const ping = client?.ws?.ping && client.ws.ping > 0 ? Math.round(client.ws.ping) : 0;
+    return { guildCount, ping };
+  }
+
   app.get('/', (req, res) => {
     if (req.session.user) return res.redirect('/dashboard');
-    res.status(200).send(landingPage());
+    res.status(200).send(landingPage(getStats()));
   });
 
   app.get('/login', (req, res) => {
@@ -198,7 +233,7 @@ function createApp() {
     res.redirect(getLoginUrl());
   });
 
-  app.get('/callback', async (req, res) => {
+  async function handleOAuthCallback(req, res) {
     const { code } = req.query;
     if (!code) return res.redirect('/');
     try {
@@ -228,6 +263,14 @@ function createApp() {
       console.error('OAuth2 callback error:', err);
       res.redirect('/');
     }
+  }
+
+  app.get('/callback', handleOAuthCallback);
+
+  // مسار احتياطي في حال كان تطبيق Discord مضبوطاً على رابط Redirect مختلف
+  app.get('/api/auth/discord/callback', (req, res) => {
+    const query = new URLSearchParams(req.query).toString();
+    res.redirect(`/callback${query ? `?${query}` : ''}`);
   });
 
   app.get('/dashboard', (req, res) => {
