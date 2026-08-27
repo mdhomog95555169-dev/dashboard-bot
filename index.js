@@ -168,6 +168,7 @@ client.on('messageCreate', async (message) => {
 
 client.login(process.env.DISCORD_TOKEN);
 
+console.log('🚀 Booting Express dashboard from dashboard.js (createApp) — no plain-text root route exists.');
 const app = createApp();
 app.listen(process.env.PORT || 3000, () => {
   console.log(`🌐 Dashboard listening on port ${process.env.PORT || 3000}`);

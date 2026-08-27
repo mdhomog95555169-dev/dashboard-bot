@@ -6,8 +6,6 @@ const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const CALLBACK_URL = process.env.CALLBACK_URL;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'oscorp-rp-fallback-secret';
 
-// صلاحيات البوت: Ban, Kick, Manage Channels, View/Send/Manage Messages,
-// Embed Links, Read History, Mute/Move Members, Manage Nicknames/Roles, Timeout
 const BOT_PERMISSIONS = '1099935345686';
 const BOT_SCOPES = 'bot applications.commands';
 const OAUTH_SCOPES = 'identify guilds';
@@ -113,7 +111,7 @@ function createApp() {
 
   app.get('/', (req, res) => {
     if (req.session.user) return res.redirect('/dashboard');
-    res.send(landingPage());
+    res.status(200).send(landingPage());
   });
 
   app.get('/login', (req, res) => {
