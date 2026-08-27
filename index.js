@@ -1,9 +1,9 @@
 require('dotenv').config();
 const { Client, GatewayIntentBits, Partials, Collection } = require('discord.js');
-const http = require('http');
 const { commands } = require('./commands');
 const { getPrefix } = require('./database');
 const { handleMessage: handleAutomod } = require('./automod');
+const { createApp } = require('./dashboard');
 
 const client = new Client({
   intents: [
@@ -168,11 +168,7 @@ client.on('messageCreate', async (message) => {
 
 client.login(process.env.DISCORD_TOKEN);
 
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-  res.end('OS System Engine (OSCORP RP) Bot is running.');
-});
-
-server.listen(process.env.PORT || 3000, () => {
-  console.log(`🌐 HTTP server listening on port ${process.env.PORT || 3000}`);
+const app = createApp();
+app.listen(process.env.PORT || 3000, () => {
+  console.log(`🌐 Dashboard listening on port ${process.env.PORT || 3000}`);
 });
