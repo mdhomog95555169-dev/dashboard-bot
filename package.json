@@ -1,0 +1,16 @@
+{
+  "name": "oscorp-rp-bot",
+  "version": "1.2.0",
+  "description": "OS System Engine (OSCORP RP) Discord Bot with Dashboard",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "deploy": "node deploy-commands.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-session": "^1.18.0"
+  }
+}
