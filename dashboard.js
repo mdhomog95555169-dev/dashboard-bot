@@ -27,7 +27,7 @@ async function fetchGuildChannels(guildId) {
     });
     if (!res.ok) return [];
     const channels = await res.json();
-    return channels.filter(c => c.type === 0); // Text Channels
+    return channels.filter(c => c.type === 0);
   } catch (err) {
     return [];
   }
@@ -42,10 +42,10 @@ function layout(title, body) {
 <title>${title}</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
   body { font-family: 'Cairo', sans-serif; background: #07090e; }
-  .glow { box-shadow: 0 0 40px rgba(99, 102, 241, 0.4); }
+  .glow { box-shadow: 0 0 35px rgba(99, 102, 241, 0.35); }
   .gradient-text { background: linear-gradient(90deg, #818cf8, #c084fc, #60a5fa); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); }
 </style>
@@ -63,35 +63,20 @@ function landingPage() {
     
     <div class="relative z-10 text-center max-w-3xl">
       <span class="inline-block px-5 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-sm font-bold mb-6">
-        ⚡ OSCORP RP Bot Engine Ultimate v2.0
+        🚀 OSCORP RP Bot Engine Ultimate v3.0
       </span>
       <h1 class="text-5xl md:text-7xl font-black mb-6 gradient-text tracking-tight">OS System Engine</h1>
       <p class="text-gray-300 text-lg md:text-xl mb-10 leading-relaxed font-medium">
-        المحرك الإداري الأقوى لإدارة وتأمين سيرفرات ديسكورد بالكامل مع نظام تذاكر وحماية فائقة.
+        المحرك الإداري الأقوى لإدارة وتأمين سيرفرات ديسكورد بالكامل مع نظام تذاكر وترحيب مخصص وحماية فائقة.
       </p>
       
       <div class="flex flex-col sm:flex-row gap-4 justify-center mb-12">
         <a href="/login" class="glow px-8 py-4 rounded-2xl bg-gradient-to-r from-indigo-500 via-indigo-600 to-blue-600 font-extrabold text-white hover:scale-105 transition-all duration-300 flex items-center justify-center gap-2">
-          🔐 تسجيل الدخول عبر Discord
+          🔑 تسجيل الدخول عبر Discord
         </a>
         <a href="${getInviteUrl()}" target="_blank" class="px-8 py-4 rounded-2xl glass font-extrabold text-white hover:bg-white/10 hover:scale-105 transition-all duration-300 flex items-center justify-center gap-2">
           ➕ إضافة البوت للسيرفر
         </a>
-      </div>
-
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
-        <div class="glass p-5 rounded-2xl border border-indigo-500/20">
-          <div class="text-3xl font-black text-indigo-400 mb-1">99.99%</div>
-          <div class="text-xs text-gray-400 font-bold">مدة التشغيل (Uptime)</div>
-        </div>
-        <div class="glass p-5 rounded-2xl border border-purple-500/20">
-          <div class="text-3xl font-black text-purple-400 mb-1">Ultra</div>
-          <div class="text-xs text-gray-400 font-bold">حماية وتذاكر متطورة</div>
-        </div>
-        <div class="glass p-5 rounded-2xl border border-blue-500/20">
-          <div class="text-3xl font-black text-blue-400 mb-1">< 10ms</div>
-          <div class="text-xs text-gray-400 font-bold">سرعة الاستجابة</div>
-        </div>
       </div>
     </div>
   </div>`);
@@ -148,14 +133,15 @@ function guildManagePage(user, guildId, currentTab = 'settings', channels = []) 
 
   const tabs = [
     { id: 'settings', name: '⚙️ الإعدادات العامة' },
-    { id: 'welcome', name: '👋 الترحيب والمغادرة' },
+    { id: 'welcome', name: '🎉 الترحيب والمغادرة' },
+    { id: 'moderation', name: '⚔️ الإشراف والإدارة' },
     { id: 'automod', name: '🛡️ الحماية المتقدمة (AutoMod)' },
-    { id: 'tickets', name: '🎟️ إدارة التذاكر' },
+    { id: 'tickets', name: '🎫 إدارة التذاكر' },
     { id: 'support', name: '💬 الدعم والروابط' }
   ];
 
   const navTabs = tabs.map(t => `
-    <a href="/dashboard/${guildId}?tab=${t.id}" class="px-5 py-3 rounded-xl font-extrabold text-sm transition-all ${currentTab === t.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/40 border border-indigo-400/30' : 'glass text-gray-400 hover:text-white'}">
+    <a href="/dashboard/${guildId}?tab=${t.id}" class="px-5 py-3 rounded-xl font-extrabold text-sm transition-all flex items-center gap-2 ${currentTab === t.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/40 border border-indigo-400/30' : 'glass text-gray-400 hover:text-white'}">
       ${t.name}
     </a>
   `).join('');
@@ -208,11 +194,11 @@ function guildManagePage(user, guildId, currentTab = 'settings', channels = []) 
         </form>
 
       ` : currentTab === 'welcome' ? `
-        <h3 class="text-2xl font-black mb-6 flex items-center gap-2">👋 نظام الترحيب والمغادرة المطور</h3>
-        <form class="space-y-6">
+        <h3 class="text-2xl font-black mb-6 flex items-center gap-2">🎉 نظام الترحيب والمغادرة المطور + كرت الصورة Custom</h3>
+        <form class="space-y-6" enctype="multipart/form-data">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label class="block text-sm font-bold text-gray-300 mb-2">تحديد قناة الترحيب (Select Welcome Channel)</label>
+              <label class="block text-sm font-bold text-gray-300 mb-2">تحديد قناة الترحيب (Welcome Channel)</label>
               <select class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500">
                 ${channelOptions}
               </select>
@@ -224,15 +210,87 @@ function guildManagePage(user, guildId, currentTab = 'settings', channels = []) 
               </select>
             </div>
           </div>
+
           <div>
-            <label class="block text-sm font-bold text-gray-300 mb-2">رسالة الترحيب المخصصة</label>
-            <textarea class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 h-28" placeholder="مرحباً بك {user} في سيرفرنا! نورت المكان 🌟"></textarea>
+            <label class="block text-sm font-bold text-gray-300 mb-2">رسالة الترحيب النصية المخصصة</label>
+            <textarea class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 h-24" placeholder="مرحباً بك {user} في سيرفرنا! نورت المكان 🌟"></textarea>
           </div>
+
+          <div class="p-6 glass rounded-2xl border border-indigo-500/20 space-y-4">
+            <h4 class="font-extrabold text-indigo-400 text-lg flex items-center gap-2">🖼️ إعدادات صورة كرت الترحيب والكركتر (Avatar Canvas)</h4>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label class="block text-sm font-bold text-gray-300 mb-2">رفع صورة الخلفية (Upload Background Image)</label>
+                <input type="file" accept="image/*" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500" />
+              </div>
+              <div>
+                <label class="block text-sm font-bold text-gray-300 mb-2">أو رابط خلفية مباشر (Image URL)</label>
+                <input type="text" placeholder="https://i.imgur.com/example.png" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" />
+              </div>
+            </div>
+
+            <div class="border-t border-white/10 pt-4">
+              <label class="block text-sm font-bold text-gray-300 mb-3">📍 التحكم في موضع وحجم صوّرة العضو (User Avatar position X, Y, Size):</label>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-gray-400 mb-1">الموقع الأفقي (Avatar X)</label>
+                  <input type="number" value="250" class="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500" />
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-gray-400 mb-1">الموقع الرأسي (Avatar Y)</label>
+                  <input type="number" value="100" class="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500" />
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-gray-400 mb-1">حجم الصورة (Avatar Size)</label>
+                  <input type="number" value="120" class="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500" />
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-gray-400 mb-1">تدوير الحواف (Border Radius)</label>
+                  <input type="number" value="50" class="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500" placeholder="50% للدائري" />
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="flex items-center gap-4">
             <input type="checkbox" id="welcome_card" checked class="w-5 h-5 accent-indigo-600" />
-            <label for="welcome_card" class="text-sm font-bold text-gray-300">إرسال كرت صورة الترحيب المباشرة</label>
+            <label for="welcome_card" class="text-sm font-bold text-gray-300">تفعيل إرسال كرت صورة الترحيب المباشرة</label>
           </div>
-          <button type="button" class="glow px-8 py-3.5 rounded-xl bg-indigo-600 font-extrabold text-white hover:bg-indigo-500 transition-all">حفظ الإعدادات</button>
+          <button type="button" class="glow px-8 py-3.5 rounded-xl bg-indigo-600 font-extrabold text-white hover:bg-indigo-500 transition-all">حفظ الإعدادات بالكامل</button>
+        </form>
+
+      ` : currentTab === 'moderation' ? `
+        <h3 class="text-2xl font-black mb-6 flex items-center gap-2">⚔️ نظام الإشراف والعقوبات المتقدم (Moderation Engine)</h3>
+        <form class="space-y-6">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label class="block text-sm font-bold text-gray-300 mb-2">قناة سجل العقوبات والإداريات (Mod Log Channel)</label>
+              <select class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500">
+                ${channelOptions}
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-gray-300 mb-2">رتبة الميوت التلقائية (Mute Role)</label>
+              <input type="text" placeholder="Muted" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" />
+            </div>
+          </div>
+
+          <div class="space-y-4">
+            <div class="flex items-center justify-between p-4 glass rounded-2xl border border-white/5">
+              <div><div class="font-bold text-white">حظر الحسابات الوهمية والجديدة (Anti-Alt Accounts)</div><div class="text-xs text-gray-400">طرد أو حظر الحسابات التي أنشئت منذ أقل من 7 أيام</div></div>
+              <input type="checkbox" checked class="w-6 h-6 accent-indigo-600" />
+            </div>
+            <div class="flex items-center justify-between p-4 glass rounded-2xl border border-white/5">
+              <div><div class="font-bold text-white">نظام التحذيرات التلقائي (Auto Warn System)</div><div class="text-xs text-gray-400">إعطاء ميوت تلقائي بعد 3 تحذيرات وبان بعد 5 تحذيرات</div></div>
+              <input type="checkbox" checked class="w-6 h-6 accent-indigo-600" />
+            </div>
+            <div class="flex items-center justify-between p-4 glass rounded-2xl border border-white/5">
+              <div><div class="font-bold text-white">سجل تعديل وحذف الرسائل (Message Logs)</div><div class="text-xs text-gray-400">تسجيل أي رسالة تم تعديلها أو حذفها داخل السيرفر</div></div>
+              <input type="checkbox" checked class="w-6 h-6 accent-indigo-600" />
+            </div>
+          </div>
+          <button type="button" class="glow px-8 py-3.5 rounded-xl bg-indigo-600 font-extrabold text-white hover:bg-indigo-500 transition-all">حفظ إعدادات الإشراف</button>
         </form>
 
       ` : currentTab === 'automod' ? `
@@ -261,7 +319,7 @@ function guildManagePage(user, guildId, currentTab = 'settings', channels = []) 
         </div>
 
       ` : currentTab === 'tickets' ? `
-        <h3 class="text-2xl font-black mb-6 flex items-center gap-2">🎟️ نظام التذاكر الاحترافي x1000000</h3>
+        <h3 class="text-2xl font-black mb-6 flex items-center gap-2">🎫 نظام التذاكر الاحترافي x1000000</h3>
         <form class="space-y-6">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -308,7 +366,7 @@ function guildManagePage(user, guildId, currentTab = 'settings', channels = []) 
             </div>
           </a>
           <a href="https://x.com" target="_blank" class="p-5 glass rounded-2xl flex items-center gap-4 hover:border-blue-500/50 transition-all">
-            <div class="text-2xl">🐦</div>
+            <div class="text-2xl">🌐</div>
             <div>
               <div class="font-bold text-white">تويتر / X</div>
               <div class="text-xs text-gray-400">تحديثات المشروع</div>
