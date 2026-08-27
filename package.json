@@ -1,7 +1,7 @@
 {
   "name": "oscorp-rp-bot",
-  "version": "1.0.0",
-  "description": "Oscorp RP Discord Moderation Bot",
+  "version": "1.1.0",
+  "description": "OS System Engine (OSCORP RP) Discord Bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "better-sqlite3": "^11.3.0"
   }
 }

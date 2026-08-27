@@ -1,10 +1,10 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Partials, Collection, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, Collection } = require('discord.js');
 const http = require('http');
-const { commands, createEmbed } = require('./commands');
-const { getAllAliases, setAlias } = require('./data');
+const { commands } = require('./commands');
+const { getPrefix } = require('./database');
+const { handleMessage: handleAutomod } = require('./automod');
 
-const PREFIX = '-';
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -19,29 +19,104 @@ const client = new Client({
 client.commands = new Collection();
 for (const cmd of commands) client.commands.set(cmd.name, cmd);
 
-function buildContext(guild, channel, invoker, isSlash, rawObj, optsFetcher) {
+function checkPermission(member, permission) {
+  if (!permission) return true;
+  return member.permissions.has(permission);
+}
+
+async function resolveMemberArg(guild, raw) {
+  if (!raw) return null;
+  const id = raw.replace(/[<@!>]/g, '');
+  try { return await guild.members.fetch(id); } catch { return null; }
+}
+
+async function resolveRoleArg(guild, raw) {
+  if (!raw) return null;
+  const id = raw.replace(/[<@&>]/g, '');
+  return guild.roles.cache.get(id) || guild.roles.cache.find((r) => r.name.toLowerCase() === raw.toLowerCase()) || null;
+}
+
+function resolveChannelArg(guild, raw, fallback) {
+  if (!raw) return fallback;
+  const id = raw.replace(/[<#>]/g, '');
+  return guild.channels.cache.get(id) || fallback;
+}
+
+function reply(target, isSlash, content) {
+  const payload = typeof content === 'string' ? { content } : content;
+  return target.reply(payload);
+}
+
+function buildSlashCtx(interaction) {
+  const guild = interaction.guild;
+  const opts = interaction.options;
   return {
-    guild,
-    channel,
-    invoker,
-    isSlash,
-    raw: rawObj,
-    replyEmbed: (embed) => rawObj.reply({ embeds: [embed] }),
-    replySuccess: (text, fields = []) => {
-      const embed = new EmbedBuilder().setColor('#57F287').setTitle('✅ تم بنجاح').setDescription(text).setTimestamp();
-      if (fields.length) embed.addFields(fields);
-      return rawObj.reply({ embeds: [embed] });
+    guild, channel: interaction.channel, invoker: interaction.member,
+    isSlash: true, raw: interaction, args: [],
+    getUserMember: async (name) => {
+      const u = opts.getUser(name);
+      if (!u) return null;
+      try { return await guild.members.fetch(u.id); } catch { return null; }
     },
-    replyError: (text) => {
-      const embed = new EmbedBuilder().setColor('#ED4245').setTitle('❌ خطأ في الإجراء').setDescription(text).setTimestamp();
-      return rawObj.reply({ embeds: [embed], ephemeral: isSlash });
-    },
-    ...optsFetcher
+    getString: (name) => opts.getString(name),
+    getInteger: (name) => opts.getInteger(name),
+    getRole: (name) => opts.getRole(name),
+    getChannel: (name) => opts.getChannel(name) || interaction.channel,
+    reply: (content) => reply(interaction, true, content),
+  };
+}
+
+async function buildPrefixCtx(message, args, optionDefs) {
+  const guild = message.guild;
+  const parsed = {};
+  let idx = 0;
+  for (const def of optionDefs) {
+    if (def.type === 'user') {
+      parsed[def.name] = args[idx] ? await resolveMemberArg(guild, args[idx]) : null;
+      idx++;
+    } else if (def.type === 'role') {
+      parsed[def.name] = args[idx] ? await resolveRoleArg(guild, args[idx]) : null;
+      idx++;
+    } else if (def.type === 'channel') {
+      const val = args[idx];
+      const isChannelLike = val && (/^<#\d+>$/.test(val) || guild.channels.cache.has(val.replace(/[<#>]/g, '')));
+      if (def.required) {
+        parsed[def.name] = val ? resolveChannelArg(guild, val, message.channel) : message.channel;
+        idx++;
+      } else if (isChannelLike) {
+        parsed[def.name] = resolveChannelArg(guild, val, message.channel);
+        idx++;
+      } else {
+        parsed[def.name] = message.channel;
+      }
+    } else if (def.type === 'integer') {
+      const n = parseInt(args[idx], 10);
+      parsed[def.name] = Number.isNaN(n) ? null : n;
+      idx++;
+    } else {
+      if (def.consumeRest) {
+        parsed[def.name] = args.slice(idx).join(' ') || null;
+        idx = args.length;
+      } else {
+        parsed[def.name] = args[idx] || null;
+        idx++;
+      }
+    }
+  }
+  return {
+    guild, channel: message.channel, invoker: message.member,
+    isSlash: false, raw: message, args,
+    getUserMember: async (name) => parsed[name] || null,
+    getString: (name) => parsed[name] || null,
+    getInteger: (name) => (typeof parsed[name] === 'number' ? parsed[name] : null),
+    getRole: (name) => parsed[name] || null,
+    getChannel: (name) => parsed[name] || message.channel,
+    reply: (content) => reply(message, false, content),
   };
 }
 
 client.once('ready', () => {
-  console.log(`✅ OS System Engine Connected as ${client.user.tag}`);
+  console.log(`✅ Logged in as ${client.user.tag}`);
 });
 
 client.on('interactionCreate', async (interaction) => {
@@ -49,104 +124,55 @@ client.on('interactionCreate', async (interaction) => {
   const command = client.commands.get(interaction.commandName);
   if (!command) return;
 
-  if (command.permission && !interaction.member.permissions.has(command.permission)) {
-    return interaction.reply({ embeds: [createEmbed('❌ لا تملك الصلاحية', 'ليس لديك إذن لاستخدام هذا الأمر.', '#ED4245')], ephemeral: true });
+  if (command.permission && !checkPermission(interaction.member, command.permission)) {
+    return interaction.reply({ content: '❌ لا تملك الصلاحية لاستخدام هذا الأمر.', ephemeral: true });
   }
 
-  const opts = interaction.options;
-  const ctx = buildContext(interaction.guild, interaction.channel, interaction.member, true, interaction, {
-    getUserMember: async (name) => {
-      const u = opts.getUser(name);
-      return u ? interaction.guild.members.fetch(u.id).catch(() => null) : null;
-    },
-    getString: (name) => opts.getString(name),
-    getInteger: (name) => opts.getInteger(name),
-    getRole: (name) => opts.getRole(name),
-    getChannel: (name) => opts.getChannel(name) || interaction.channel,
-  });
-
-  try { await command.execute(ctx); } catch (e) { console.error(e); }
+  try {
+    const ctx = buildSlashCtx(interaction);
+    await command.execute(ctx);
+  } catch (err) {
+    console.error(err);
+    const payload = { content: '⚠️ حدث خطأ أثناء تنفيذ الأمر.', ephemeral: true };
+    if (interaction.deferred || interaction.replied) await interaction.editReply(payload);
+    else await interaction.reply(payload);
+  }
 });
 
 client.on('messageCreate', async (message) => {
   if (message.author.bot || !message.guild) return;
-  if (!message.content.startsWith(PREFIX)) return;
 
-  const args = message.content.slice(PREFIX.length).trim().split(/\s+/);
-  const inputCmd = args.shift().toLowerCase();
+  const handled = await handleAutomod(message).catch((err) => { console.error('AutoMod error:', err); return false; });
+  if (handled) return;
 
-  // فحص الأوامر أو الاختصارات التخصيصية
-  let command = client.commands.get(inputCmd);
-  if (!command) {
-    const aliases = getAllAliases();
-    const realName = Object.keys(aliases).find(key => aliases[key] === inputCmd);
-    if (realName) command = client.commands.get(realName);
-  }
+  const prefix = getPrefix(message.guild.id);
+  if (!message.content.startsWith(prefix)) return;
 
+  const args = message.content.slice(prefix.length).trim().split(/\s+/);
+  const cmdName = args.shift().toLowerCase();
+  const command = client.commands.get(cmdName);
   if (!command) return;
 
-  if (command.permission && !message.member.permissions.has(command.permission)) {
-    return message.reply({ embeds: [createEmbed('❌ لا تملك الصلاحية', 'أنت لا تملك الصلاحيات الكافية.', '#ED4245')] });
+  if (command.permission && !checkPermission(message.member, command.permission)) {
+    return message.reply('❌ لا تملك الصلاحية لاستخدام هذا الأمر.');
   }
 
-  const parsed = {};
-  let idx = 0;
-  const optionDefs = command.options || [];
-
-  for (const def of optionDefs) {
-    if (def.type === 'user') {
-      const raw = args[idx++];
-      parsed[def.name] = raw ? await message.guild.members.fetch(raw.replace(/[<@!>]/g, '')).catch(() => null) : null;
-    } else if (def.type === 'integer') {
-      const n = parseInt(args[idx++], 10);
-      parsed[def.name] = Number.isNaN(n) ? null : n;
-    } else {
-      if (def.consumeRest) {
-        parsed[def.name] = args.slice(idx).join(' ') || null;
-        idx = args.length;
-      } else {
-        parsed[def.name] = args[idx++] || null;
-      }
-    }
+  try {
+    const ctx = await buildPrefixCtx(message, args, command.options || []);
+    await command.execute(ctx);
+  } catch (err) {
+    console.error(err);
+    message.reply('⚠️ حدث خطأ أثناء تنفيذ الأمر.');
   }
-
-  const ctx = buildContext(message.guild, message.channel, message.member, false, message, {
-    getUserMember: async (name) => parsed[name] || null,
-    getString: (name) => parsed[name] || null,
-    getInteger: (name) => parsed[name] || null,
-    getRole: (name) => parsed[name] || null,
-    getChannel: (name) => message.channel,
-  });
-
-  try { await command.execute(ctx); } catch (e) { console.error(e); }
-});
-
-// خادم الـ Dashboard التفاعلي لإدارة اختصارات الأوامر عبر المتصفح
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-  const aliases = getAllAliases();
-  let listHtml = commands.map(c => `
-    <div style="margin-bottom: 12px; background: #2f3136; padding: 10px; border-radius: 6px;">
-      <strong>/${c.name}</strong> - ${c.description} <br/>
-      <small style="color:#aaa;">الاختصار الحالي: ${aliases[c.name] || 'لا يوجد'}</small>
-    </div>
-  `).join('');
-
-  res.end(`
-    <!DOCTYPE html>
-    <html dir="rtl">
-    <head><title>OS System Command Dashboard</title></head>
-    <body style="font-family: sans-serif; background: #36393f; color: white; padding: 20px;">
-      <h2>⚡ لوحة التحكم في اختصارات الأوامر (OS Engine)</h2>
-      <p>جميع أوامر البوت تعمل الآن بـ 100% كـ Slash Commands أو Prefix commands (-):</p>
-      ${listHtml}
-    </body>
-    </html>
-  `);
-});
-
-server.listen(process.env.PORT || 3000, () => {
-  console.log(`🌐 Dashboard running on port ${process.env.PORT || 3000}`);
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+  res.end('OS System Engine (OSCORP RP) Bot is running.');
+});
+
+server.listen(process.env.PORT || 3000, () => {
+  console.log(`🌐 HTTP server listening on port ${process.env.PORT || 3000}`);
+});
