@@ -1,5 +1,6 @@
 const express = require('express');
 const session = require('express-session');
+const { getAutomodSettings, getPrefix } = require('./database');
 
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
@@ -9,6 +10,7 @@ const SESSION_SECRET = process.env.SESSION_SECRET || 'oscorp-rp-fallback-secret'
 const BOT_PERMISSIONS = '1099935345686';
 const BOT_SCOPES = 'bot applications.commands';
 const OAUTH_SCOPES = 'identify guilds';
+const ADMINISTRATOR = BigInt(0x8);
 
 function getInviteUrl() {
   return `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&permissions=${BOT_PERMISSIONS}&scope=${encodeURIComponent(BOT_SCOPES)}`;
@@ -18,7 +20,12 @@ function getLoginUrl() {
   return `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(CALLBACK_URL)}&response_type=code&scope=${encodeURIComponent(OAUTH_SCOPES)}`;
 }
 
-function layout(title, body) {
+function isAdmin(guild) {
+  try { return (BigInt(guild.permissions) & ADMINISTRATOR) === ADMINISTRATOR; }
+  catch { return false; }
+}
+
+function layout(title, body, extraHead = '') {
   return `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -27,13 +34,39 @@ function layout(title, body) {
 <title>${title}</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
-<style>body{font-family:'Cairo',sans-serif;background:#0b0d14;}
-.glow{box-shadow:0 0 40px rgba(99,102,241,.35)}
-.gradient-text{background:linear-gradient(90deg,#818cf8,#a78bfa,#60a5fa);-webkit-background-clip:text;background-clip:text;color:transparent}
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { font-family: 'Cairo', sans-serif; }
+  body {
+    background: #05060a;
+    background-image:
+      radial-gradient(circle at 15% 20%, rgba(129,140,248,0.18), transparent 40%),
+      radial-gradient(circle at 85% 15%, rgba(167,139,250,0.15), transparent 40%),
+      radial-gradient(circle at 50% 90%, rgba(96,165,250,0.12), transparent 45%);
+    min-height: 100vh;
+  }
+  .glass {
+    background: rgba(255,255,255,0.04);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .glow-btn { box-shadow: 0 0 25px rgba(99,102,241,.45), 0 0 60px rgba(99,102,241,.15); transition: all .3s ease; }
+  .glow-btn:hover { box-shadow: 0 0 40px rgba(99,102,241,.7), 0 0 90px rgba(99,102,241,.25); transform: translateY(-3px) scale(1.03); }
+  .gradient-text { background: linear-gradient(90deg,#818cf8,#c084fc,#60a5fa); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .float { animation: float 6s ease-in-out infinite; }
+  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
+  .pulse-ring { animation: pulse-ring 2.5s cubic-bezier(0.4,0,0.6,1) infinite; }
+  @keyframes pulse-ring { 0%{opacity:.6; transform:scale(1)} 100%{opacity:0; transform:scale(1.8)} }
+  .fade-up { animation: fadeUp .8s ease both; }
+  @keyframes fadeUp { from{opacity:0; transform:translateY(24px)} to{opacity:1; transform:translateY(0)} }
+  .card-hover { transition: all .3s ease; }
+  .card-hover:hover { transform: translateY(-6px); border-color: rgba(129,140,248,0.5); box-shadow: 0 10px 40px rgba(99,102,241,.25); }
+  ::-webkit-scrollbar { width: 8px; } ::-webkit-scrollbar-thumb { background: rgba(129,140,248,0.4); border-radius: 10px; }
 </style>
+${extraHead}
 </head>
-<body class="min-h-screen text-gray-100">
+<body class="text-gray-100">
 ${body}
 </body>
 </html>`;
@@ -42,60 +75,104 @@ ${body}
 function landingPage() {
   return layout('OS System Engine | OSCORP RP', `
   <div class="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden">
-    <div class="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(99,102,241,0.15),transparent_60%)]"></div>
-    <div class="relative z-10 text-center max-w-2xl">
-      <span class="inline-block px-4 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-sm mb-6">⚡ OSCORP RP Bot Engine</span>
-      <h1 class="text-5xl md:text-6xl font-extrabold mb-4 gradient-text">OS System Engine</h1>
-      <p class="text-gray-400 text-lg mb-10">لوحة تحكم متكاملة لإدارة سيرفرك، الحماية التلقائية، والتذاكر — بتصميم عصري وأداء عالي.</p>
-      <div class="flex flex-col sm:flex-row gap-4 justify-center">
-        <a href="/login" class="glow px-8 py-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-blue-500 font-bold text-white hover:scale-105 transition-transform flex items-center justify-center gap-2">
-          🔐 تسجيل الدخول
+    <div class="absolute top-1/4 -left-20 w-72 h-72 bg-indigo-600/20 rounded-full blur-3xl float"></div>
+    <div class="absolute bottom-1/4 -right-20 w-72 h-72 bg-purple-600/20 rounded-full blur-3xl float" style="animation-delay:2s"></div>
+
+    <div class="relative z-10 text-center max-w-2xl fade-up">
+      <div class="relative inline-block mb-6">
+        <span class="absolute inset-0 rounded-full bg-indigo-500/40 pulse-ring"></span>
+        <span class="relative inline-block px-5 py-1.5 rounded-full glass text-indigo-300 text-sm font-semibold">⚡ OSCORP RP Bot Engine</span>
+      </div>
+      <h1 class="text-5xl md:text-7xl font-black mb-5 gradient-text leading-tight">OS System Engine</h1>
+      <p class="text-gray-400 text-lg md:text-xl mb-12 leading-relaxed">لوحة تحكم متكاملة لإدارة سيرفرك، الحماية التلقائية، والتذاكر<br/>بتصميم عصري وأداء خارق.</p>
+      <div class="flex flex-col sm:flex-row gap-5 justify-center">
+        <a href="/login" class="glow-btn px-9 py-4 rounded-2xl bg-gradient-to-r from-indigo-500 via-purple-500 to-blue-500 font-bold text-white flex items-center justify-center gap-2 text-lg">
+          🔐 تسجيل الدخول عبر Discord
         </a>
-        <a href="${getInviteUrl()}" target="_blank" class="px-8 py-4 rounded-2xl bg-white/5 border border-white/10 font-bold text-white hover:bg-white/10 hover:scale-105 transition-all flex items-center justify-center gap-2">
+        <a href="${getInviteUrl()}" target="_blank" class="px-9 py-4 rounded-2xl glass font-bold text-white hover:bg-white/10 hover:-translate-y-1 transition-all flex items-center justify-center gap-2 text-lg">
           ➕ إضافة البوت للسيرفر
         </a>
       </div>
     </div>
-    <div class="relative z-10 mt-16 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl w-full">
-      <div class="bg-white/5 border border-white/10 rounded-xl p-5 text-center">
-        <div class="text-2xl mb-2">🛡️</div><div class="font-bold">حماية تلقائية</div>
+
+    <div class="relative z-10 mt-20 grid grid-cols-1 sm:grid-cols-3 gap-5 max-w-3xl w-full fade-up" style="animation-delay:.2s">
+      <div class="glass card-hover rounded-2xl p-6 text-center">
+        <div class="text-3xl mb-3">🛡️</div><div class="font-bold text-lg mb-1">حماية تلقائية</div>
+        <p class="text-gray-500 text-sm">مكافحة السبام والروابط والكلمات المحظورة</p>
       </div>
-      <div class="bg-white/5 border border-white/10 rounded-xl p-5 text-center">
-        <div class="text-2xl mb-2">🎟️</div><div class="font-bold">نظام تذاكر</div>
+      <div class="glass card-hover rounded-2xl p-6 text-center">
+        <div class="text-3xl mb-3">🎟️</div><div class="font-bold text-lg mb-1">نظام تذاكر</div>
+        <p class="text-gray-500 text-sm">دعم فني احترافي بأزرار تفاعلية</p>
       </div>
-      <div class="bg-white/5 border border-white/10 rounded-xl p-5 text-center">
-        <div class="text-2xl mb-2">⚙️</div><div class="font-bold">تحكم كامل</div>
+      <div class="glass card-hover rounded-2xl p-6 text-center">
+        <div class="text-3xl mb-3">⚙️</div><div class="font-bold text-lg mb-1">تحكم كامل</div>
+        <p class="text-gray-500 text-sm">25+ أمر إداري بصلاحيات دقيقة</p>
       </div>
     </div>
   </div>`);
 }
 
 function dashboardPage(user, guilds) {
-  const manageable = guilds.filter((g) => (BigInt(g.permissions) & BigInt(0x20)) === BigInt(0x20));
+  const adminGuilds = guilds.filter(isAdmin);
   const avatar = user.avatar
     ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`
     : `https://cdn.discordapp.com/embed/avatars/${Number(user.discriminator || 0) % 5}.png`;
 
-  const guildCards = manageable.length
-    ? manageable.map((g) => `
-      <div class="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-3 hover:bg-white/10 transition-all">
-        <img src="${g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png` : 'https://cdn.discordapp.com/embed/avatars/0.png'}" class="w-10 h-10 rounded-full" />
-        <span class="font-semibold truncate">${g.name}</span>
+  const guildCards = adminGuilds.length
+    ? adminGuilds.map((g) => `
+      <div class="glass card-hover rounded-2xl p-5 flex items-center gap-4">
+        <img src="${g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png` : 'https://cdn.discordapp.com/embed/avatars/0.png'}" class="w-12 h-12 rounded-full border border-white/10" />
+        <div class="flex-1 min-w-0">
+          <div class="font-bold truncate">${g.name}</div>
+          <div class="text-xs text-indigo-300">Administrator</div>
+        </div>
+        <a href="/manage/${g.id}" class="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 text-sm font-bold whitespace-nowrap hover:scale-105 transition-transform">إدارة السيرفر</a>
       </div>`).join('')
-    : `<p class="text-gray-400 col-span-full text-center">لا تملك صلاحية "إدارة السيرفر" في أي سيرفر متاح.</p>`;
+    : `<p class="text-gray-400 col-span-full text-center py-10">لا تملك صلاحية Administrator في أي سيرفر متاح لحسابك.</p>`;
 
   return layout('لوحة التحكم | OSCORP RP', `
-  <nav class="flex items-center justify-between px-8 py-5 border-b border-white/10">
-    <span class="font-extrabold text-xl gradient-text">OS System Engine</span>
+  <nav class="flex items-center justify-between px-8 py-5 glass sticky top-0 z-20">
+    <span class="font-black text-xl gradient-text">OS System Engine</span>
     <div class="flex items-center gap-4">
-      <img src="${avatar}" class="w-9 h-9 rounded-full border border-white/20" />
-      <span class="font-semibold">${user.username}</span>
-      <a href="/logout" class="text-sm px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 hover:bg-red-500/20">تسجيل خروج</a>
+      <img src="${avatar}" class="w-10 h-10 rounded-full border-2 border-indigo-400/40" />
+      <span class="font-semibold hidden sm:inline">${user.username}</span>
+      <a href="/logout" class="text-sm px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 hover:bg-red-500/20 transition-colors">تسجيل خروج</a>
     </div>
   </nav>
-  <div class="max-w-5xl mx-auto px-6 py-10">
-    <h2 class="text-2xl font-bold mb-6">سيرفراتك</h2>
-    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">${guildCards}</div>
+  <div class="max-w-5xl mx-auto px-6 py-12 fade-up">
+    <h2 class="text-3xl font-black mb-2">سيرفراتك</h2>
+    <p class="text-gray-500 mb-8">السيرفرات التي تملك فيها صلاحية Administrator</p>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">${guildCards}</div>
+  </div>`);
+}
+
+function manageGuildPage(guildId, guildName, automod) {
+  const row = (label, enabled) => `
+    <div class="glass rounded-xl p-4 flex items-center justify-between">
+      <span class="font-semibold">${label}</span>
+      <span class="px-3 py-1 rounded-full text-xs font-bold ${enabled ? 'bg-green-500/20 text-green-300' : 'bg-white/5 text-gray-400'}">${enabled ? 'مفعّل' : 'معطّل'}</span>
+    </div>`;
+
+  return layout(`إدارة ${guildName} | OSCORP RP`, `
+  <nav class="flex items-center justify-between px-8 py-5 glass sticky top-0 z-20">
+    <a href="/dashboard" class="font-black text-xl gradient-text">OS System Engine</a>
+    <a href="/dashboard" class="text-sm px-4 py-2 rounded-xl glass hover:bg-white/10">⟵ رجوع للوحة</a>
+  </nav>
+  <div class="max-w-3xl mx-auto px-6 py-12 fade-up">
+    <h2 class="text-3xl font-black mb-1">${guildName}</h2>
+    <p class="text-gray-500 mb-8">البادئة الحالية: <span class="text-indigo-300 font-bold">${automod.prefix}</span></p>
+
+    <h3 class="text-xl font-bold mb-4">🛡️ حالة الحماية التلقائية (AutoMod)</h3>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
+      ${row('منع الروابط', automod.anti_link)}
+      ${row('منع السبام', automod.anti_spam)}
+      ${row('منع الكلمات المحظورة', automod.anti_badwords)}
+      ${row('منع الأحرف الكبيرة', automod.anti_caps)}
+      ${row('منع المنشن المكثف', automod.anti_mentions)}
+    </div>
+    <div class="glass rounded-2xl p-6 text-center text-gray-400">
+      🚧 تعديل هذه الإعدادات مباشرة من اللوحة قادم في المرحلة القادمة من التطوير.
+    </div>
   </div>`);
 }
 
@@ -156,6 +233,17 @@ function createApp() {
   app.get('/dashboard', (req, res) => {
     if (!req.session.user) return res.redirect('/login');
     res.send(dashboardPage(req.session.user, req.session.guilds || []));
+  });
+
+  app.get('/manage/:guildId', (req, res) => {
+    if (!req.session.user) return res.redirect('/login');
+    const { guildId } = req.params;
+    const guild = (req.session.guilds || []).find((g) => g.id === guildId);
+    if (!guild || !isAdmin(guild)) return res.status(403).send('❌ لا تملك صلاحية Administrator في هذا السيرفر.');
+
+    const automod = getAutomodSettings(guildId);
+    automod.prefix = getPrefix(guildId);
+    res.send(manageGuildPage(guildId, guild.name, automod));
   });
 
   app.get('/logout', (req, res) => {
