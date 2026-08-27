@@ -1,65 +1,57 @@
 const fs = require('fs');
 const path = require('path');
 
-const DATA_DIR = path.join(__dirname, 'data');
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+const DATA_FILE = path.join(__dirname, 'bot_data.json');
 
-const WARN_FILE = path.join(DATA_DIR, 'warnings.json');
-const POINTS_FILE = path.join(DATA_DIR, 'points.json');
+let data = {
+  warnings: {},
+  points: {},
+  prefix: '-',
+  customPrefixes: {}, // اختصارات القواعد لكل سيرفر
+  commandAliases: {} // اختصارات الأوامر التخصيصية
+};
 
-function loadJSON(file) {
-  if (!fs.existsSync(file)) return {};
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
-  catch { return {}; }
+if (fs.existsSync(DATA_FILE)) {
+  try {
+    data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+  } catch (e) {
+    console.error('Error loading data:', e);
+  }
 }
 
-function saveJSON(file, data) {
-  fs.writeFileSync(file, JSON.stringify(data, null, 2));
+function saveData() {
+  try {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+  } catch (e) {
+    console.error('Error saving data:', e);
+  }
 }
 
-function getWarnings(guildId, userId) {
-  const all = loadJSON(WARN_FILE);
-  if (!all[guildId]) all[guildId] = {};
-  if (!all[guildId][userId]) all[guildId][userId] = [];
-  return all[guildId][userId];
-}
-
-function addWarning(guildId, userId, reason, moderatorId) {
-  const all = loadJSON(WARN_FILE);
-  if (!all[guildId]) all[guildId] = {};
-  if (!all[guildId][userId]) all[guildId][userId] = [];
-  const warning = {
-    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-    reason,
-    moderatorId,
-    date: new Date().toISOString(),
-  };
-  all[guildId][userId].push(warning);
-  saveJSON(WARN_FILE, all);
-  return warning;
-}
-
-function removeWarning(guildId, userId, warnId) {
-  const all = loadJSON(WARN_FILE);
-  if (!all[guildId] || !all[guildId][userId]) return false;
-  const before = all[guildId][userId].length;
-  all[guildId][userId] = all[guildId][userId].filter((w) => w.id !== warnId);
-  saveJSON(WARN_FILE, all);
-  return all[guildId][userId].length < before;
-}
-
-function getPoints(guildId, userId) {
-  const all = loadJSON(POINTS_FILE);
-  if (!all[guildId]) all[guildId] = {};
-  return all[guildId][userId] || 0;
-}
-
-function addPoints(guildId, userId, amount) {
-  const all = loadJSON(POINTS_FILE);
-  if (!all[guildId]) all[guildId] = {};
-  all[guildId][userId] = (all[guildId][userId] || 0) + amount;
-  saveJSON(POINTS_FILE, all);
-  return all[guildId][userId];
-}
-
-module.exports = { getWarnings, addWarning, removeWarning, getPoints, addPoints };
+module.exports = {
+  getWarnings: (guildId, userId) => data.warnings[`${guildId}_${userId}`] || [],
+  addWarning: (guildId, userId, reason, moderatorId) => {
+    const key = `${guildId}_${userId}`;
+    if (!data.warnings[key]) data.warnings[key] = [];
+    const item = { id: Date.now().toString(36), reason, moderatorId, date: new Date().toISOString() };
+    data.warnings[key].push(item);
+    saveData();
+    return item;
+  },
+  removeWarning: (guildId, userId, warnId) => {
+    const key = `${guildId}_${userId}`;
+    if (!data.warnings[key]) return false;
+    const initialLen = data.warnings[key].length;
+    data.warnings[key] = data.warnings[key].filter(w => w.id !== warnId);
+    if (data.warnings[key].length !== initialLen) {
+      saveData();
+      return true;
+    }
+    return false;
+  },
+  getAlias: (cmdName) => data.commandAliases[cmdName] || null,
+  setAlias: (cmdName, alias) => {
+    data.commandAliases[cmdName] = alias;
+    saveData();
+  },
+  getAllAliases: () => data.commandAliases
+};
