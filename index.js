@@ -4,6 +4,7 @@ const { commands } = require('./commands');
 const { getPrefix } = require('./database');
 const { handleMessage: handleAutomod } = require('./automod');
 const { createApp } = require('./dashboard');
+const { deployCommands } = require('./deploy-commands');
 
 const client = new Client({
   intents: [
@@ -115,8 +116,13 @@ async function buildPrefixCtx(message, args, optionDefs) {
   };
 }
 
-client.once('ready', () => {
+client.once('ready', async () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
+  try {
+    await deployCommands();
+  } catch (err) {
+    console.error('⚠️ Auto slash command registration failed:', err);
+  }
 });
 
 client.on('interactionCreate', async (interaction) => {
@@ -168,8 +174,7 @@ client.on('messageCreate', async (message) => {
 
 client.login(process.env.DISCORD_TOKEN);
 
-console.log('🚀 Booting Express dashboard from dashboard.js (createApp) — no plain-text root route exists.');
-const app = createApp();
+const app = createApp(client);
 app.listen(process.env.PORT || 3000, () => {
   console.log(`🌐 Dashboard listening on port ${process.env.PORT || 3000}`);
 });
