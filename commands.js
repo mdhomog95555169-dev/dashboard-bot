@@ -2,7 +2,81 @@ const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder
 
 module.exports = {
   commands: [
-    // 🎟️ 1. Ticket Setup Command
+    // 🧹 1. Clear Command (مع الخيارات المتقدمة + رد مؤقت ثم التحويل لإمبد)
+    {
+      data: new SlashCommandBuilder()
+        .setName('clear')
+        .setDescription('Purge bulk messages from the channel')
+        .addIntegerOption(opt => 
+          opt.setName('number_of_messages')
+            .setDescription('Number of messages to delete.')
+            .setRequired(true)
+        )
+        .addUserOption(opt => 
+          opt.setName('filter_by_user')
+            .setDescription('Filter messages by specific user (Optional)')
+            .setRequired(false)
+        )
+        .addRoleOption(opt => 
+          opt.setName('filter_by_role')
+            .setDescription('Filter messages by specific role (Optional)')
+            .setRequired(false)
+        )
+        .addBooleanOption(opt => 
+          opt.setName('filter_by_bots')
+            .setDescription('Filter only bot messages (Optional)')
+            .setRequired(false)
+        )
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+      async execute(interaction) {
+        const amount = interaction.options.getInteger('number_of_messages');
+        const targetUser = interaction.options.getUser('filter_by_user');
+        const targetRole = interaction.options.getRole('filter_by_role');
+        const filterBots = interaction.options.getBoolean('filter_by_bots');
+
+        // الرد الأولي السريع كما في الفيديو
+        await interaction.reply({ content: 'Deleting messages ...' });
+
+        // جلب الرسائل
+        let fetchedMessages = await interaction.channel.messages.fetch({ limit: 100 }).catch(() => null);
+
+        if (!fetchedMessages) {
+          const failEmbed = new EmbedBuilder()
+            .setDescription('❌ | تعذر جلب الرسائل من هذا الروم.')
+            .setColor('#ed4245');
+          return await interaction.editReply({ content: null, embeds: [failEmbed] });
+        }
+
+        // تطبيق الفلاتر إن وجدت
+        let messagesToDelete = Array.from(fetchedMessages.values());
+
+        if (targetUser) {
+          messagesToDelete = messagesToDelete.filter(m => m.author.id === targetUser.id);
+        }
+        if (targetRole) {
+          messagesToDelete = messagesToDelete.filter(m => m.member && m.member.roles.cache.has(targetRole.id));
+        }
+        if (filterBots) {
+          messagesToDelete = messagesToDelete.filter(m => m.author.bot);
+        }
+
+        // اقتطاع العدد المطلوبة
+        messagesToDelete = messagesToDelete.slice(0, amount);
+
+        // تنفيذ الحذف
+        const deleted = await interaction.channel.bulkDelete(messagesToDelete, true).catch(() => null);
+        const count = deleted ? deleted.size : messagesToDelete.length;
+
+        // تعديل الرسالة إلى Embed مطابق لشكل البروبوت
+        const clearEmbed = new EmbedBuilder()
+          .setDescription(`\`\`\`${count} messages have been deleted.\`\`\``)
+          .setColor('#2f3136');
+
+        await interaction.editReply({ content: null, embeds: [clearEmbed] });
+      }
+    },
+
+    // 🎟️ 2. Ticket Setup Command
     {
       data: new SlashCommandBuilder()
         .setName('ticket-setup')
@@ -64,7 +138,7 @@ module.exports = {
       }
     },
 
-    // 📖 2. Help Command
+    // 📖 3. Help Command
     {
       data: new SlashCommandBuilder()
         .setName('help')
@@ -74,7 +148,7 @@ module.exports = {
           .setTitle('⚙️ Oscorp System Command Hub')
           .setDescription(
             'أهلاً بك في قائمة أوامر النظام.\n\n' +
-            '**حالة النظام:** 🟢 جميع الـ 21 أمر شغال بنجاح\n\n' +
+            '**حالة النظام:** 🟢 جميع الأوامر تعمل بنجاح\n\n' +
             'اختر قسم الأوامر من القائمة المنسدلة لعرض تفاصيل الأوامر.'
           )
           .setColor('#2f3136')
@@ -92,27 +166,6 @@ module.exports = {
         );
 
         await interaction.reply({ embeds: [helpEmbed], components: [helpMenu] });
-      }
-    },
-
-    // 🧹 3. Clear Command
-    {
-      data: new SlashCommandBuilder().setName('clear').setDescription('🧹 Purge specified amount of messages')
-        .addIntegerOption(opt => opt.setName('amount').setDescription('🔢 Number of messages (1-100)').setRequired(true))
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
-      async execute(interaction) {
-        const amount = interaction.options.getInteger('amount');
-        
-        await interaction.reply({ content: 'Deleting messages ...' });
-
-        const deleted = await interaction.channel.bulkDelete(amount, true).catch(() => null);
-        const count = deleted ? deleted.size : amount;
-
-        const clearEmbed = new EmbedBuilder()
-          .setDescription(`🧹 | ${count} messages have been deleted.`)
-          .setColor('#2f3136');
-
-        await interaction.editReply({ content: null, embeds: [clearEmbed] });
       }
     },
 
