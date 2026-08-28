@@ -1,224 +1,300 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
 
 module.exports = {
   commands: [
     // -------------------------------------------------------------
-    // 🎟️ 1. أمر إعداد لوحة التذاكر المخصص بالكامل (Custom Ticket Setup)
+    // 🎟️ 1. أمر إعداد لوحة التذاكر المخصص (Ticket Setup)
     // -------------------------------------------------------------
     {
       data: new SlashCommandBuilder()
         .setName('ticket-setup')
-        .setDescription('Setup customizable Ticket Panel with custom categories, descriptions, emojis & banner')
-        .addStringOption(opt => opt.setName('title').setDescription('Panel Title / عنوان لوحة التذاكر').setRequired(true))
-        .addStringOption(opt => opt.setName('description').setDescription('Panel Description / وصف لوحة التذاكر').setRequired(true))
-        .addStringOption(opt => opt.setName('cat1_label').setDescription('Category 1 Name / اسم القسم 1').setRequired(true))
-        .addStringOption(opt => opt.setName('cat1_desc').setDescription('Category 1 Description / وصف القسم 1').setRequired(true))
-        .addStringOption(opt => opt.setName('cat1_emoji').setDescription('Category 1 Emoji / إيموجي القسم 1').setRequired(false))
-        .addStringOption(opt => opt.setName('cat2_label').setDescription('Category 2 Name / اسم القسم 2').setRequired(false))
-        .addStringOption(opt => opt.setName('cat2_desc').setDescription('Category 2 Description / وصف القسم 2').setRequired(false))
-        .addStringOption(opt => opt.setName('cat2_emoji').setDescription('Category 2 Emoji / إيموجي القسم 2').setRequired(false))
-        .addStringOption(opt => opt.setName('cat3_label').setDescription('Category 3 Name / اسم القسم 3').setRequired(false))
-        .addStringOption(opt => opt.setName('cat3_desc').setDescription('Category 3 Description / وصف القسم 3').setRequired(false))
-        .addStringOption(opt => opt.setName('cat3_emoji').setDescription('Category 3 Emoji / إيموجي القسم 3').setRequired(false))
-        .addStringOption(opt => opt.setName('image_url').setDescription('Banner Image URL (Optional) / رابط صورة البنر').setRequired(false))
+        .setDescription('إنشاء لوحة تذاكر مخصصة مع إيكون وبنر وأقسام')
+        .addStringOption(opt => opt.setName('title').setDescription('عنوان اللوحة / Embed Title').setRequired(true))
+        .addStringOption(opt => opt.setName('description').setDescription('وصف وتعليمات اللوحة').setRequired(true))
+        .addStringOption(opt => opt.setName('icon_url').setDescription('رابط آيكون صغير / Small Icon URL').setRequired(false))
+        .addStringOption(opt => opt.setName('banner_url').setDescription('رابط بنر كبير / Large Banner URL').setRequired(false))
+        
+        // الأقسام (حتى 5 أقسام)
+        .addStringOption(opt => opt.setName('cat1_label').setDescription('اسم القسم 1').setRequired(true))
+        .addStringOption(opt => opt.setName('cat1_emoji').setDescription('إيموجي القسم 1 (رمز أو Custom ID)').setRequired(false))
+        
+        .addStringOption(opt => opt.setName('cat2_label').setDescription('اسم القسم 2').setRequired(false))
+        .addStringOption(opt => opt.setName('cat2_emoji').setDescription('إيموجي القسم 2').setRequired(false))
+        
+        .addStringOption(opt => opt.setName('cat3_label').setDescription('اسم القسم 3').setRequired(false))
+        .addStringOption(opt => opt.setName('cat3_emoji').setDescription('إيموجي القسم 3').setRequired(false))
+        
+        .addStringOption(opt => opt.setName('cat4_label').setDescription('اسم القسم 4').setRequired(false))
+        .addStringOption(opt => opt.setName('cat4_emoji').setDescription('إيموجي القسم 4').setRequired(false))
+        
+        .addStringOption(opt => opt.setName('cat5_label').setDescription('اسم القسم 5').setRequired(false))
+        .addStringOption(opt => opt.setName('cat5_emoji').setDescription('إيموجي القسم 5').setRequired(false))
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
       async execute(interaction) {
         const title = interaction.options.getString('title');
         const description = interaction.options.getString('description');
-        const imageUrl = interaction.options.getString('image_url');
+        const iconUrl = interaction.options.getString('icon_url');
+        const bannerUrl = interaction.options.getString('banner_url');
 
-        // تجهيز خيارات القائمة المنسدلة حسب الإدخالات
         const options = [];
-
-        // القسم 1 (إجباري)
-        options.push({
-          label: interaction.options.getString('cat1_label'),
-          description: interaction.options.getString('cat1_desc'),
-          value: 'cat_1',
-          emoji: interaction.options.getString('cat1_emoji') || '📂'
-        });
-
-        // القسم 2 (اختياري)
-        const cat2Label = interaction.options.getString('cat2_label');
-        if (cat2Label) {
-          options.push({
-            label: cat2Label,
-            description: interaction.options.getString('cat2_desc') || 'Category 2',
-            value: 'cat_2',
-            emoji: interaction.options.getString('cat2_emoji') || '📂'
-          });
-        }
-
-        // القسم 3 (اختياري)
-        const cat3Label = interaction.options.getString('cat3_label');
-        if (cat3Label) {
-          options.push({
-            label: cat3Label,
-            description: interaction.options.getString('cat3_desc') || 'Category 3',
-            value: 'cat_3',
-            emoji: interaction.options.getString('cat3_emoji') || '📂'
-          });
+        for (let i = 1; i <= 5; i++) {
+          const label = interaction.options.getString(`cat${i}_label`);
+          const emoji = interaction.options.getString(`cat${i}_emoji`);
+          if (label) {
+            const optObj = { label: label, value: `cat_${i}` };
+            if (emoji) optObj.emoji = emoji;
+            options.push(optObj);
+          }
         }
 
         const ticketEmbed = new EmbedBuilder()
           .setTitle(title)
           .setDescription(description)
           .setColor('#5865F2')
-          .setFooter({ text: 'Oscorp Ticket System • Select a category below' })
           .setTimestamp();
 
-        if (imageUrl) ticketEmbed.setImage(imageUrl);
+        if (iconUrl) ticketEmbed.setThumbnail(iconUrl);
+        if (bannerUrl) ticketEmbed.setImage(bannerUrl);
 
         const selectMenu = new ActionRowBuilder().addComponents(
           new StringSelectMenuBuilder()
             .setCustomId('custom_ticket_select')
-            .setPlaceholder('📂 Choose Category / اختر قسم التذكرة...')
+            .setPlaceholder('اختر نوع التذكرة / Choose Ticket Category...')
             .addOptions(options)
         );
 
         await interaction.channel.send({ embeds: [ticketEmbed], components: [selectMenu] });
-        await interaction.reply({ content: '✅ Custom Ticket Panel created successfully!', ephemeral: true });
+        await interaction.reply({ content: '✅ **تم إنشاء لوحة التذاكر بنجاح!**' });
       }
     },
 
     // -------------------------------------------------------------
-    // 🛡️ 2. أوامر الإشراف والإدارة (Moderation Commands)
+    // 📖 2. أمر المساعدة الشامل (/help) بأسلوب ProBot
     // -------------------------------------------------------------
-    
-    // Ban
+    {
+      data: new SlashCommandBuilder()
+        .setName('help')
+        .setDescription('عرض قائمة أوامر البوت المتاحة'),
+      async execute(interaction) {
+        const helpText = `
+📌 **قائمة أوامر البوت المتاحة:**
+
+🛡️ **أوامر الإشراف والأعضاء (Moderation & Utility):**
+• \`/ban <member> [reason]\` - حظر عضو من السيرفر
+• \`/kick <member> [reason]\` - طرد عضو من السيرفر
+• \`/timeout <member> <minutes> [reason]\` - إعطاء تايم أوت (إسكات) لعضو
+• \`/untimeout <member>\` - إزالة التايم أوت عن عضو
+• \`/clear <amount>\` - مسح عدد محدد من الرسائل (1-100)
+• \`/vkick <member>\` - طرد عضو من الروم الصوتي
+
+🔒 **أوامر إشراف القنوات (Channel Moderation):**
+• \`/lock\` - قفل القناة الحالية
+• \`/unlock\` - فتح القناة الحالية
+• \`/hide\` - إخفاء القناة عن الأعضاء
+• \`/unhide\` - إظهار القناة للأعضاء
+• \`/slowmode <seconds>\` - تفعيل وضع البطء للرسائل
+
+ℹ️ **أوامر المعلومات والمرافق (Utility):**
+• \`/user [member]\` - عرض معلومات حسابك أو عضو آخر
+• \`/server\` - عرض معلومات وإحصائيات السيرفر
+• \`/avatar [member]\` - عرض صورة الحساب الشخصي
+
+🎟️ **إدارة التذاكر:**
+• \`/ticket-setup\` - إعداد لوحة التذاكر الاحترافية
+`;
+        await interaction.reply({ content: helpText });
+      }
+    },
+
+    // -------------------------------------------------------------
+    // 🛡️ 3. أوامر الإشراف والأعضاء (Moderation Commands)
+    // -------------------------------------------------------------
     {
       data: new SlashCommandBuilder()
         .setName('ban')
-        .setDescription('Ban a user from the server')
-        .addUserOption(opt => opt.setName('target').setDescription('Target User').setRequired(true))
-        .addStringOption(opt => opt.setName('reason').setDescription('Reason for Ban'))
+        .setDescription('حظر عضو من السيرفر')
+        .addUserOption(opt => opt.setName('target').setDescription('العضو المستهدف').setRequired(true))
+        .addStringOption(opt => opt.setName('reason').setDescription('السبب'))
         .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
       async execute(interaction) {
         const target = interaction.options.getUser('target');
-        const reason = interaction.options.getString('reason') || 'No reason specified';
+        const reason = interaction.options.getString('reason') || 'بدون سبب مذكور';
         await interaction.guild.members.ban(target, { reason });
-        await interaction.reply({ content: `⛔ **${target.tag}** has been banned. Reason: ${reason}` });
+        await interaction.reply({ content: `✅ **تم حظر ${target.tag} بنجاح.** | السبب: ${reason}` });
       }
     },
-
-    // Kick
     {
       data: new SlashCommandBuilder()
         .setName('kick')
-        .setDescription('Kick a user from the server')
-        .addUserOption(opt => opt.setName('target').setDescription('Target User').setRequired(true))
-        .addStringOption(opt => opt.setName('reason').setDescription('Reason for Kick'))
+        .setDescription('طرد عضو من السيرفر')
+        .addUserOption(opt => opt.setName('target').setDescription('العضو المستهدف').setRequired(true))
+        .addStringOption(opt => opt.setName('reason').setDescription('السبب'))
         .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers),
       async execute(interaction) {
         const member = interaction.options.getMember('target');
-        const reason = interaction.options.getString('reason') || 'No reason specified';
-        if (!member) return interaction.reply({ content: '❌ User not found.', ephemeral: true });
+        const reason = interaction.options.getString('reason') || 'بدون سبب مذكور';
+        if (!member) return interaction.reply({ content: '❌ لم يتم العثور على العضو.' });
         await member.kick(reason);
-        await interaction.reply({ content: `👞 **${member.user.tag}** has been kicked. Reason: ${reason}` });
+        await interaction.reply({ content: `✅ **تم طرد ${member.user.tag} بنجاح.** | السبب: ${reason}` });
       }
     },
-
-    // Timeout (Mute)
     {
       data: new SlashCommandBuilder()
         .setName('timeout')
-        .setDescription('Timeout/Mute a user')
-        .addUserOption(opt => opt.setName('target').setDescription('Target User').setRequired(true))
-        .addIntegerOption(opt => opt.setName('minutes').setDescription('Duration in Minutes').setRequired(true))
-        .addStringOption(opt => opt.setName('reason').setDescription('Reason'))
+        .setDescription('إسكات / تايم أوت للعضو')
+        .addUserOption(opt => opt.setName('target').setDescription('العضو المستهدف').setRequired(true))
+        .addIntegerOption(opt => opt.setName('minutes').setDescription('المدة بالدقائق').setRequired(true))
+        .addStringOption(opt => opt.setName('reason').setDescription('السبب'))
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
       async execute(interaction) {
         const member = interaction.options.getMember('target');
         const minutes = interaction.options.getInteger('minutes');
-        const reason = interaction.options.getString('reason') || 'No reason specified';
-        if (!member) return interaction.reply({ content: '❌ User not found.', ephemeral: true });
+        const reason = interaction.options.getString('reason') || 'بدون سبب مذكور';
+        if (!member) return interaction.reply({ content: '❌ لم يتم العثور على العضو.' });
         await member.timeout(minutes * 60 * 1000, reason);
-        await interaction.reply({ content: `🔇 **${member.user.tag}** timed out for ${minutes} minutes. Reason: ${reason}` });
+        await interaction.reply({ content: `🔇 **تم إعطاء تايم أوت لـ ${member.user.tag} لمدة ${minutes} دقيقة.** | السبب: ${reason}` });
       }
     },
-
-    // Untimeout (Unmute)
     {
       data: new SlashCommandBuilder()
         .setName('untimeout')
-        .setDescription('Remove timeout from a user')
-        .addUserOption(opt => opt.setName('target').setDescription('Target User').setRequired(true))
+        .setDescription('إزالة التايم أوت عن العضو')
+        .addUserOption(opt => opt.setName('target').setDescription('العضو المستهدف').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
       async execute(interaction) {
         const member = interaction.options.getMember('target');
-        if (!member) return interaction.reply({ content: '❌ User not found.', ephemeral: true });
+        if (!member) return interaction.reply({ content: '❌ لم يتم العثور على العضو.' });
         await member.timeout(null);
-        await interaction.reply({ content: `🔊 Timeout removed from **${member.user.tag}**.` });
+        await interaction.reply({ content: `🔊 **تم إزالة التايم أوت عن ${member.user.tag}.**` });
       }
     },
-
-    // Clear (Purge Messages)
     {
       data: new SlashCommandBuilder()
         .setName('clear')
-        .setDescription('Clear bulk messages from the channel')
-        .addIntegerOption(opt => opt.setName('amount').setDescription('Number of messages (1-100)').setRequired(true))
+        .setDescription('مسح عدد محدد من الرسائل')
+        .addIntegerOption(opt => opt.setName('amount').setDescription('عدد الرسائل (1-100)').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
       async execute(interaction) {
         const amount = interaction.options.getInteger('amount');
-        if (amount < 1 || amount > 100) return interaction.reply({ content: '❌ Choose between 1 and 100 messages.', ephemeral: true });
+        if (amount < 1 || amount > 100) return interaction.reply({ content: '❌ اختر عدداً بين 1 و 100.' });
         await interaction.channel.bulkDelete(amount, true);
-        await interaction.reply({ content: `🧹 Cleared ${amount} messages.`, ephemeral: true });
+        await interaction.reply({ content: `🧹 **تم حذف ${amount} رسالة بنجاح.**` });
       }
     },
-
-    // Lock Channel
-    {
-      data: new SlashCommandBuilder()
-        .setName('lock')
-        .setDescription('Lock the current text channel')
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
-      async execute(interaction) {
-        await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { SendMessages: false });
-        await interaction.reply({ content: '🔒 Channel locked successfully.' });
-      }
-    },
-
-    // Unlock Channel
-    {
-      data: new SlashCommandBuilder()
-        .setName('unlock')
-        .setDescription('Unlock the current text channel')
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
-      async execute(interaction) {
-        await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { SendMessages: true });
-        await interaction.reply({ content: '🔓 Channel unlocked successfully.' });
-      }
-    },
-
-    // VKick (Voice Kick)
     {
       data: new SlashCommandBuilder()
         .setName('vkick')
-        .setDescription('Kick a user from voice channel')
-        .addUserOption(opt => opt.setName('target').setDescription('Target User').setRequired(true))
+        .setDescription('طرد عضو من الروم الصوتي')
+        .addUserOption(opt => opt.setName('target').setDescription('العضو المستهدف').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.MoveMembers),
       async execute(interaction) {
         const member = interaction.options.getMember('target');
-        if (!member || !member.voice.channel) return interaction.reply({ content: '❌ User is not in a voice channel!', ephemeral: true });
+        if (!member || !member.voice.channel) return interaction.reply({ content: '❌ العضو ليس متواجداً في روم صوتي!' });
         await member.voice.setChannel(null);
-        await interaction.reply({ content: `🔊 Kicked **${member.user.tag}** from voice channel.` });
+        await interaction.reply({ content: `🔊 **تم طرد ${member.user.tag} من الروم الصوتي.**` });
       }
     },
 
-    // Help Command
+    // -------------------------------------------------------------
+    // 🔒 4. أوامر إشراف القنوات (Channel Moderation)
+    // -------------------------------------------------------------
     {
-      data: new SlashCommandBuilder().setName('help').setDescription('View available commands'),
+      data: new SlashCommandBuilder()
+        .setName('lock')
+        .setDescription('قفل الروم الحالي')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
       async execute(interaction) {
-        const helpEmbed = new EmbedBuilder()
-          .setTitle('✨ Oscorp System Help')
-          .setDescription('Available Commands List:')
-          .setColor('#5865F2')
-          .addFields(
-            { name: '🎟️ Tickets', value: '`/ticket-setup`' },
-            { name: '🛡️ Moderation', value: '`/ban`, `/kick`, `/timeout`, `/untimeout`, `/clear`, `/lock`, `/unlock`, `/vkick`' }
-          );
-        await interaction.reply({ embeds: [helpEmbed], ephemeral: true });
+        await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { SendMessages: false });
+        await interaction.reply({ content: `🔒 **تم قفل القناة بنجاح:** <#${interaction.channel.id}>` });
+      }
+    },
+    {
+      data: new SlashCommandBuilder()
+        .setName('unlock')
+        .setDescription('فتح الروم الحالي')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
+      async execute(interaction) {
+        await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { SendMessages: true });
+        await interaction.reply({ content: `🔓 **تم فتح القناة بنجاح:** <#${interaction.channel.id}>` });
+      }
+    },
+    {
+      data: new SlashCommandBuilder()
+        .setName('hide')
+        .setDescription('إخفاء الروم عن باقي الأعضاء')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
+      async execute(interaction) {
+        await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { ViewChannel: false });
+        await interaction.reply({ content: `👁️‍🗨️ **تم إخفاء القناة بنجاح.**` });
+      }
+    },
+    {
+      data: new SlashCommandBuilder()
+        .setName('unhide')
+        .setDescription('إظهار الروم للأعضاء')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
+      async execute(interaction) {
+        await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { ViewChannel: true });
+        await interaction.reply({ content: `👁️ **تم إظهار القناة بنجاح.**` });
+      }
+    },
+    {
+      data: new SlashCommandBuilder()
+        .setName('slowmode')
+        .setDescription('تحديد الوقت بين الرسائل (وضع البطء)')
+        .addIntegerOption(opt => opt.setName('seconds').setDescription('المدة بالثواني (0 لإيقافه)').setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
+      async execute(interaction) {
+        const seconds = interaction.options.getInteger('seconds');
+        await interaction.channel.setRateLimitPerUser(seconds);
+        if (seconds === 0) {
+          await interaction.reply({ content: `🚀 **تم إيقاف وضع البطء (Slowmode).**` });
+        } else {
+          await interaction.reply({ content: `⏳ **تم تحديد وضع البطء إلى ${seconds} ثانية.**` });
+        }
+      }
+    },
+
+    // -------------------------------------------------------------
+    // ℹ️ 5. أوامر المرافق والمعلومات (Utility Commands)
+    // -------------------------------------------------------------
+    {
+      data: new SlashCommandBuilder()
+        .setName('user')
+        .setDescription('عرض معلومات الحساب')
+        .addUserOption(opt => opt.setName('target').setDescription('العضو (اختياري)')),
+      async execute(interaction) {
+        const user = interaction.options.getUser('target') || interaction.user;
+        const member = await interaction.guild.members.fetch(user.id).catch(() => null);
+        const joinedAt = member ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>` : 'غير معروف';
+        const createdAt = `<t:${Math.floor(user.createdTimestamp / 1000)}:R>`;
+        
+        await interaction.reply({
+          content: `👤 **معلومات العضو:** ${user.tag}\n🆔 **ID:** \`${user.id}\` \n📅 **تاريخ إنشاء الحساب:** ${createdAt}\n📥 **تاريخ الانضمام للسيرفر:** ${joinedAt}`
+        });
+      }
+    },
+    {
+      data: new SlashCommandBuilder()
+        .setName('server')
+        .setDescription('عرض معلومات السيرفر'),
+      async execute(interaction) {
+        const guild = interaction.guild;
+        const createdAt = `<t:${Math.floor(guild.createdTimestamp / 1000)}:R>`;
+        await interaction.reply({
+          content: `🏰 **اسم السيرفر:** ${guild.name}\n🆔 **ID:** \`${guild.id}\` \n👥 **عدد الأعضاء:** \`${guild.memberCount}\` \n👑 **المالك:** <@${guild.ownerId}>\n📅 **تاريخ الإنشاء:** ${createdAt}`
+        });
+      }
+    },
+    {
+      data: new SlashCommandBuilder()
+        .setName('avatar')
+        .setDescription('عرض صورة الحساب الشخصي')
+        .addUserOption(opt => opt.setName('target').setDescription('العضو (اختياري)')),
+      async execute(interaction) {
+        const user = interaction.options.getUser('target') || interaction.user;
+        const avatarUrl = user.displayAvatarURL({ dynamic: true, size: 1024 });
+        await interaction.reply({ content: `🖼️ **صورة الحساب الشخصي لـ ${user.tag}:**\n${avatarUrl}` });
       }
     }
   ]

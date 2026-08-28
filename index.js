@@ -42,7 +42,7 @@ client.once('ready', async () => {
   dashboard.listen(PORT, () => console.log(`🌐 Dashboard running on port ${PORT}`));
 });
 
-// معالجة التفاعل مع القوائم المخصصة للتذاكر والأزرار
+// التعامل مع جميع التفاعلات (أوامر ورسائل عامة مثل ProBot)
 client.on('interactionCreate', async (interaction) => {
   if (interaction.isChatInputCommand()) {
     const command = client.commands.get(interaction.commandName);
@@ -50,12 +50,11 @@ client.on('interactionCreate', async (interaction) => {
   } 
   else if (interaction.isStringSelectMenu()) {
     if (interaction.customId === 'custom_ticket_select') {
-      const selectedValue = interaction.values[0]; // cat_1, cat_2, cat_3
       const ticketName = `ticket-${interaction.user.username}`;
       const existingChannel = interaction.guild.channels.cache.find(c => c.name === ticketName);
 
       if (existingChannel) {
-        return interaction.reply({ content: `❌ You already have an open ticket: ${existingChannel}`, ephemeral: true });
+        return interaction.reply({ content: `❌ **لديك تذكرة مفتوحة بالفعل:** ${existingChannel}` });
       }
 
       const settings = await Settings.findOne({ guildId: interaction.guild.id });
@@ -81,26 +80,26 @@ client.on('interactionCreate', async (interaction) => {
       const channel = await interaction.guild.channels.create(channelOptions);
 
       const ticketEmbed = new EmbedBuilder()
-        .setTitle(`🎟️ Support Ticket`)
-        .setDescription(`Hello <@${interaction.user.id}>!\nWelcome to your support ticket. Please explain your inquiry or problem here.`)
+        .setTitle(`🎟️ تذكرة جديدة / Support Ticket`)
+        .setDescription(`أهلاً بك <@${interaction.user.id}>!\nيرجى كتابة مشكلتك أو استفسارك هنا وسيقوم فريق الإدارة بالرد عليك قريباً.`)
         .setColor('#5865F2')
         .setFooter({ text: 'Oscorp Ticket System' });
 
       const closeBtn = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId('close_ticket')
-          .setLabel('Close Ticket')
+          .setLabel('إغلاق التذكرة / Close')
           .setStyle(ButtonStyle.Danger)
           .setEmoji('🔒')
       );
 
       await channel.send({ embeds: [ticketEmbed], components: [closeBtn] });
-      await interaction.reply({ content: `✅ Ticket created successfully: ${channel}`, ephemeral: true });
+      await interaction.reply({ content: `✅ **تم إنشاء تذكرتك بنجاح:** ${channel}` });
     }
   } 
   else if (interaction.isButton()) {
     if (interaction.customId === 'close_ticket') {
-      await interaction.reply({ content: '🔒 Closing ticket in 5 seconds...' });
+      await interaction.reply({ content: '🔒 **جاري إغلاق التذكرة خلال 5 ثوانٍ...**' });
       setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
     }
   }
