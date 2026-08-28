@@ -1,5 +1,5 @@
 const { Client, GatewayIntentBits, REST, Routes, ChannelType, PermissionsBitField, EmbedBuilder } = require('discord.js');
-const { commands } = require('./commands.js');
+const { commands, DEFAULT_TICKET_CATEGORY_ID } = require('./commands.js');
 
 const client = new Client({
   intents: [
@@ -13,7 +13,6 @@ const client = new Client({
 client.once('ready', async () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 
-  // تسجيل الأوامر عالمياً ولجميع السيرفرات فوراً
   const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
   try {
     const commandData = commands.map(cmd => cmd.data.toJSON());
@@ -21,7 +20,7 @@ client.once('ready', async () => {
       Routes.applicationCommands(client.user.id),
       { body: commandData }
     );
-    console.log('✅ Registered 21 Slash Commands successfully!');
+    console.log('✅ Successfully registered all 21 commands!');
   } catch (error) {
     console.error('Error registering commands:', error);
   }
@@ -35,30 +34,24 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.customId === 'custom_ticket_select') {
       const selectedValue = interaction.values[0];
       const categoryId = selectedValue.split('_')[2];
+      const targetCategory = (categoryId && categoryId !== 'null' && categoryId !== 'undefined') ? categoryId : DEFAULT_TICKET_CATEGORY_ID;
 
       const guild = interaction.guild;
       const user = interaction.user;
 
-      // إنشاء روم التذكرة داخل الكاتيجوري المحددة
       const ticketChannel = await guild.channels.create({
         name: `ticket-${user.username}`,
         type: ChannelType.GuildText,
-        parent: categoryId || null,
+        parent: targetCategory !== "ضع_اي_دي_الكاتيجوري_هنا" ? targetCategory : null,
         permissionOverwrites: [
-          {
-            id: guild.roles.everyone.id,
-            deny: [PermissionsBitField.Flags.ViewChannel],
-          },
-          {
-            id: user.id,
-            allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.AttachFiles],
-          }
+          { id: guild.roles.everyone.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+          { id: user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.AttachFiles] }
         ],
       });
 
       const welcomeEmbed = new EmbedBuilder()
-        .setTitle('🎫 تذكرة جديدة | New Ticket')
-        .setDescription(`أهلاً بك ${user}، تفضل بكتابة استفسارك وسيتم الرد عليك قريباً من الإدارة.`)
+        .setTitle('🎫 تذكرة جديدة | Ticket Created')
+        .setDescription(`مرحباً بك ${user}، اترك استفسارك وسيقوم طاقم الإدارة بالرد عليك في أقرب وقت.`)
         .setColor('#57f287');
 
       await ticketChannel.send({ content: `${user}`, embeds: [welcomeEmbed] });
