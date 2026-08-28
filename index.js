@@ -1,199 +1,66 @@
-require('dotenv').config();
-const { Client, GatewayIntentBits, Partials, Collection, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, REST, Routes } = require('discord.js');
+const config = require('./config');
 const { commands } = require('./commands');
-const { getPrefix, resolveAlias } = require('./database');
+const database = require('./database');
 const { handleMessage: handleAutomod } = require('./automod');
-const { createApp } = require('./dashboard');
-const { deployCommands } = require('./deploy-commands');
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildVoiceStates,
-  ],
-  partials: [Partials.Channel],
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildVoiceStates
+  ]
 });
 
 client.commands = new Collection();
-for (const cmd of commands) client.commands.set(cmd.name, cmd);
-
-function checkPermission(member, permission) {
-  if (!permission) return true;
-  return member.permissions.has(permission);
+for (const command of commands) {
+  client.commands.set(command.data.name, command);
 }
 
-async function resolveMemberArg(guild, raw) {
-  if (!raw) return null;
-  const id = raw.replace(/[<@!>]/g, '');
-  try { return await guild.members.fetch(id); } catch { return null; }
-}
-
-async function resolveRoleArg(guild, raw) {
-  if (!raw) return null;
-  const id = raw.replace(/[<@&>]/g, '');
-  return guild.roles.cache.get(id) || guild.roles.cache.find((r) => r.name.toLowerCase() === raw.toLowerCase()) || null;
-}
-
-function resolveChannelArg(guild, raw, fallback) {
-  if (!raw) return fallback;
-  const id = raw.replace(/[<#>]/g, '');
-  return guild.channels.cache.get(id) || fallback;
-}
-
-function reply(target, isSlash, content) {
-  const payload = typeof content === 'string' ? { content } : content;
-  return target.reply(payload);
-}
-
-function buildSlashCtx(interaction) {
-  const guild = interaction.guild;
-  const opts = interaction.options;
-  return {
-    guild, channel: interaction.channel, invoker: interaction.member,
-    isSlash: true, raw: interaction, args: [],
-    getUserMember: async (name) => {
-      const u = opts.getUser(name);
-      if (!u) return null;
-      try { return await guild.members.fetch(u.id); } catch { return null; }
-    },
-    getString: (name) => opts.getString(name),
-    getInteger: (name) => opts.getInteger(name),
-    getRole: (name) => opts.getRole(name),
-    getChannel: (name) => opts.getChannel(name) || interaction.channel,
-    reply: (content) => reply(interaction, true, content),
-  };
-}
-
-async function buildPrefixCtx(message, args, optionDefs) {
-  const guild = message.guild;
-  const parsed = {};
-  let idx = 0;
-  for (const def of optionDefs) {
-    if (def.type === 'user') {
-      parsed[def.name] = args[idx] ? await resolveMemberArg(guild, args[idx]) : null;
-      idx++;
-    } else if (def.type === 'role') {
-      parsed[def.name] = args[idx] ? await resolveRoleArg(guild, args[idx]) : null;
-      idx++;
-    } else if (def.type === 'channel') {
-      const val = args[idx];
-      const isChannelLike = val && (/^<#\d+>$/.test(val) || guild.channels.cache.has(val.replace(/[<#>]/g, '')));
-      if (def.required) {
-        parsed[def.name] = val ? resolveChannelArg(guild, val, message.channel) : message.channel;
-        idx++;
-      } else if (isChannelLike) {
-        parsed[def.name] = resolveChannelArg(guild, val, message.channel);
-        idx++;
-      } else {
-        parsed[def.name] = message.channel;
-      }
-    } else if (def.type === 'integer') {
-      const n = parseInt(args[idx], 10);
-      parsed[def.name] = Number.isNaN(n) ? null : n;
-      idx++;
-    } else {
-      if (def.consumeRest) {
-        parsed[def.name] = args.slice(idx).join(' ') || null;
-        idx = args.length;
-      } else {
-        parsed[def.name] = args[idx] || null;
-        idx++;
-      }
-    }
+async function deployCommands() {
+  try {
+    const rest = new REST({ version: '10' }).setToken(config.token);
+    const commandData = commands.map(cmd => cmd.data.toJSON());
+    await rest.put(
+      Routes.applicationCommands(config.clientId),
+      { body: commandData }
+    );
+    console.log('✅ تم تسجيل جميع أوامر Slash بنجاح!');
+  } catch (error) {
+    console.error('❌ خطأ أثناء تسجيل الأوامر:', error);
   }
-  return {
-    guild, channel: message.channel, invoker: message.member,
-    isSlash: false, raw: message, args,
-    getUserMember: async (name) => parsed[name] || null,
-    getString: (name) => parsed[name] || null,
-    getInteger: (name) => (typeof parsed[name] === 'number' ? parsed[name] : null),
-    getRole: (name) => parsed[name] || null,
-    getChannel: (name) => parsed[name] || message.channel,
-    reply: (content) => reply(message, false, content),
-  };
 }
 
 client.once('ready', async () => {
-  console.log(`✅ Logged in as ${client.user.tag}`);
-  try {
-    await deployCommands();
-  } catch (err) {
-    console.error('⚠️ Auto slash command registration failed:', err);
-  }
+  console.log(`🤖 تم تسجيل الدخول بواسطة: ${client.user.tag}`);
+  await database.connect();
+  await deployCommands();
+});
+
+client.on('messageCreate', async (message) => {
+  if (message.author.bot) return;
+  await handleAutomod(message);
 });
 
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
+
   const command = client.commands.get(interaction.commandName);
   if (!command) return;
 
-  if (command.permission && !checkPermission(interaction.member, command.permission)) {
-    return interaction.reply({ content: '❌ لا تملك الصلاحية لاستخدام هذا الأمر.', ephemeral: true });
-  }
-
   try {
-    const ctx = buildSlashCtx(interaction);
-    await command.execute(ctx);
-  } catch (err) {
-    console.error(err);
-    const payload = { content: '⚠️ حدث خطأ أثناء تنفيذ الأمر.', ephemeral: true };
-    if (interaction.deferred || interaction.replied) await interaction.editReply(payload);
-    else await interaction.reply(payload);
-  }
-});
-
-client.on('messageCreate', async (message) => {
-  if (message.author.bot || !message.guild) return;
-
-  // Mention response — replying with a plain @mention (no other command text) shows the help embed.
-  if (message.mentions.has(client.user) && !message.mentions.everyone) {
-    const mentionRegex = new RegExp(`^<@!?${client.user.id}>$`);
-    if (mentionRegex.test(message.content.trim())) {
-      const embed = new EmbedBuilder()
-        .setTitle('⚡ Need help?')
-        .setDescription('Use `-help` or `/help` to see all available options.')
-        .setColor(0x5865f2)
-        .setFooter({ text: 'OS System Engine' });
-      await message.reply({ embeds: [embed] });
-      return;
+    await command.execute(interaction);
+  } catch (error) {
+    console.error(error);
+    const replyOptions = { content: 'حدث خطأ أثناء تنفيذ هذا الأمر!', ephemeral: true };
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp(replyOptions);
+    } else {
+      await interaction.reply(replyOptions);
     }
   }
-
-  const handled = await handleAutomod(message).catch((err) => { console.error('AutoMod error:', err); return false; });
-  if (handled) return;
-
-  const prefix = await getPrefix(message.guild.id);
-  if (!message.content.startsWith(prefix)) return;
-
-  const args = message.content.slice(prefix.length).trim().split(/\s+/);
-  const cmdName = args.shift().toLowerCase();
-  let command = client.commands.get(cmdName);
-
-  if (!command) {
-    const aliasTarget = await resolveAlias(message.guild.id, cmdName).catch(() => null);
-    if (aliasTarget) command = client.commands.get(aliasTarget);
-  }
-  if (!command) return;
-
-  if (command.permission && !checkPermission(message.member, command.permission)) {
-    return message.reply('❌ لا تملك الصلاحية لاستخدام هذا الأمر.');
-  }
-
-  try {
-    const ctx = await buildPrefixCtx(message, args, command.options || []);
-    await command.execute(ctx);
-  } catch (err) {
-    console.error(err);
-    message.reply('⚠️ حدث خطأ أثناء تنفيذ الأمر.');
-  }
 });
 
-client.login(process.env.DISCORD_TOKEN);
-
-const app = createApp(client);
-app.listen(process.env.PORT || 3000, () => {
-  console.log(`🌐 Dashboard listening on port ${process.env.PORT || 3000}`);
-});
+client.login(config.token);
