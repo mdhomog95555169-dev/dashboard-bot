@@ -19,18 +19,17 @@ for (const command of commands) {
   client.commands.set(command.data.name, command);
 }
 
-// تسجيل الأوامر عالمياً وللسيرفرات مباشرة
 async function deployCommands() {
   try {
     const rest = new REST({ version: '10' }).setToken(config.token);
     const commandData = commands.map(cmd => cmd.data.toJSON());
     
-    console.log('⏳ Registering Global Slash Commands...');
+    console.log('⏳ Deploying All Slash Commands with Emojis Globally...');
     await rest.put(
       Routes.applicationCommands(config.clientId),
       { body: commandData }
     );
-    console.log('✅ All 21 Slash Commands Successfully Deployed Globally!');
+    console.log('✅ All Slash Commands Deployed Successfully!');
   } catch (error) {
     console.error('❌ Error registering slash commands:', error);
   }
@@ -51,30 +50,54 @@ client.on('interactionCreate', async (interaction) => {
     if (command) await command.execute(interaction).catch(console.error);
   } 
   else if (interaction.isStringSelectMenu()) {
-    // 📩 قائمة اختيار الأقسام المساعدة تصبح خاصة (Ephemeral - Private)
+    // 📩 قائمة اختيار الأقسام المساعدة التفصيلية الخافية (X1000 Extended Private Reply)
     if (interaction.customId === 'help_category_select') {
       const selected = interaction.values[0];
       let title = '';
       let desc = '';
 
       if (selected === 'help_mod') {
-        title = '🛡️ Moderation & Security Commands';
-        desc = '`/ban` - Ban a user from the server\n`/unban` - Remove ban by ID\n`/kick` - Kick a user\n`/timeout` - Timeout member\n`/untimeout` - Remove timeout\n`/warn` - Issue a warning\n`/clear` - Purge messages\n`/role-add` - Add role to user\n`/role-remove` - Remove role from user\n`/vkick` - Kick from voice\n`/vmove` - Move voice member\n`/vmute` - Mute in voice\n`/vunmute` - Unmute in voice\n`/vdeaf` - Deafen in voice\n`/vundeaf` - Undeafen in voice';
+        title = '🛡️ Moderation & Security Management Suite';
+        desc = 
+          '**Detailed Command Specifications:**\n\n' +
+          '• `/ban` - 🔨 **Ban User**\n  *Syntax:* `/ban user:@target reason:[text]`\n  *Permission:* `Ban Members`\n\n' +
+          '• `/unban` - 🔓 **Unban User**\n  *Syntax:* `/unban userid:[ID]`\n  *Permission:* `Ban Members`\n\n' +
+          '• `/kick` - 👢 **Kick User**\n  *Syntax:* `/kick user:@target reason:[text]`\n  *Permission:* `Kick Members`\n\n' +
+          '• `/timeout` - 🔇 **Mute/Timeout Member**\n  *Syntax:* `/timeout user:@target duration:[minutes] reason:[text]`\n  *Permission:* `Moderate Members`\n\n' +
+          '• `/untimeout` - 🔊 **Remove Timeout**\n  *Syntax:* `/untimeout user:@target`\n  *Permission:* `Moderate Members`\n\n' +
+          '• `/warn` - ⚠️ **Issue Warning**\n  *Syntax:* `/warn user:@target reason:[text]`\n  *Permission:* `Manage Messages`\n\n' +
+          '• `/clear` - 🧹 **Purge Messages**\n  *Syntax:* `/clear amount:[1-100]`\n  *Permission:* `Manage Messages`\n\n' +
+          '• `/role-add` - ➕ **Add Role**\n  *Syntax:* `/role-add user:@target role:@role`\n  *Permission:* `Manage Roles`\n\n' +
+          '• `/role-remove` - ➖ **Remove Role**\n  *Syntax:* `/role-remove user:@target role:@role`\n  *Permission:* `Manage Roles`\n\n' +
+          '• `/vkick` - 🎙️ **Voice Kick**\n  *Syntax:* `/vkick user:@target`\n  *Permission:* `Move Members`\n\n' +
+          '• `/vmove` - ↗️ **Voice Move**\n  *Syntax:* `/vmove user:@target channel:[#voice]`\n  *Permission:* `Move Members`\n\n' +
+          '• `/vmute` - 🎙️ **Voice Mute**\n  *Syntax:* `/vmute user:@target`\n  *Permission:* `Mute Members`\n\n' +
+          '• `/vunmute` - 🔊 **Voice Unmute**\n  *Syntax:* `/vunmute user:@target`\n  *Permission:* `Mute Members`\n\n' +
+          '• `/vdeaf` - 🎧 **Voice Deafen**\n  *Syntax:* `/vdeaf user:@target`\n  *Permission:* `Deafen Members`\n\n' +
+          '• `/vundeaf` - 🎧 **Voice Undeafen**\n  *Syntax:* `/vundeaf user:@target`\n  *Permission:* `Deafen Members`';
       } else if (selected === 'help_chan') {
-        title = '🔒 Channel Management Commands';
-        desc = '`/lock` - Lock current channel\n`/unlock` - Unlock channel\n`/hide` - Hide channel from members\n`/unhide` - Show channel to members\n`/slowmode` - Set slowmode timer';
+        title = '🔒 Channel Management & Protection Controls';
+        desc = 
+          '**Detailed Command Specifications:**\n\n' +
+          '• `/lock` - 🔒 **Lock Channel**\n  *Denies @everyone permission to send messages in current channel.*\n\n' +
+          '• `/unlock` - 🔓 **Unlock Channel**\n  *Restores @everyone permission to send messages.*\n\n' +
+          '• `/hide` - 👁️‍🗨️ **Hide Channel**\n  *Hides channel visibility from standard members.*\n\n' +
+          '• `/unhide` - 👁️ **Unhide Channel**\n  *Restores channel visibility to standard members.*\n\n' +
+          '• `/slowmode` - ⏳ **Channel Slowmode**\n  *Syntax:* `/slowmode seconds:[0-21600]`\n  *Sets message cooldown timer per member.*';
       } else if (selected === 'help_util') {
-        title = '⚙️ Utility & System Commands';
-        desc = '`/user` - Display member profile & ID\n`/help` - Show instructions & commands hub';
+        title = '⚙️ Utility & System Information';
+        desc = 
+          '**Detailed Command Specifications:**\n\n' +
+          '• `/user` - 👤 **User Profile Info**\n  *Syntax:* `/user user:[@optional]`\n  *Displays target or author user ID, tag, and account details.*\n\n' +
+          '• `/help` - 📖 **System Documentation**\n  *Launches this interactive help menu with full category choices.*';
       }
 
       const categoryEmbed = new EmbedBuilder()
         .setTitle(title)
         .setDescription(desc)
         .setColor('#2f3136')
-        .setFooter({ text: 'Oscorp Control Systems' });
+        .setFooter({ text: 'Oscorp Control Systems • Private Security Response' });
 
-      // إرسال رد خاص يراه المستخدم فقط (Private Message / Ephemeral)
       await interaction.reply({ embeds: [categoryEmbed], ephemeral: true });
     }
     // معالجة اختيار التذاكر
