@@ -27,9 +27,9 @@ async function deployCommands() {
       Routes.applicationCommands(config.clientId),
       { body: commandData }
     );
-    console.log('✅ Slash Commands Registered Successfully!');
+    console.log('✅ Slash Commands Registered!');
   } catch (error) {
-    console.error('❌ Slash Command Registration Error:', error);
+    console.error('❌ Error registering commands:', error);
   }
 }
 
@@ -44,52 +44,66 @@ client.once('ready', async () => {
   });
 });
 
-// نظام الترحيب التلقائي القارئ من الداشبورد
-client.on('guildMemberAdd', async (member) => {
-  try {
-    const settings = await Settings.findOne({ guildId: member.guild.id });
-    if (!settings) return;
-
-    // الرتبة التلقائية من الموقع
-    if (settings.autoRole) {
-      const role = member.guild.roles.cache.get(settings.autoRole);
-      if (role) await member.roles.add(role).catch(() => {});
-    }
-
-    // روم الترحيب المحدد من الموقع
-    if (settings.welcomeChannel) {
-      const welcomeChannel = member.guild.channels.cache.get(settings.welcomeChannel);
-      if (welcomeChannel) {
-        const msgText = (settings.welcomeMessage || 'Welcome {user}!').replace('{user}', `<@${member.id}>`);
-        const embed = new EmbedBuilder()
-          .setTitle('👋 Welcome to the Server!')
-          .setDescription(msgText)
-          .setThumbnail(member.user.displayAvatarURL())
-          .setColor('#00FF00')
-          .setTimestamp();
-        await welcomeChannel.send({ embeds: [embed] });
-      }
-    }
-  } catch (err) {
-    console.error('Welcome Event Error:', err);
-  }
-});
-
-// نظام الحماية (AutoMod) القارئ من الداشبورد
+// محرك الحماية القوية (AutoMod Engine)
 client.on('messageCreate', async (message) => {
   if (message.author.bot || !message.guild) return;
 
   try {
     const settings = await Settings.findOne({ guildId: message.guild.id });
-    
-    // فحص إذا كانت الحماية مفعلة من الموقع
-    if (settings && settings.autoModEnabled) {
-      const inviteRegex = /(discord\.(gg|io|me|li)|discordapp\.com\/invite)\/.+/i;
-      if (inviteRegex.test(message.content)) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
-          await message.delete();
-          return message.channel.send(`⚠️ <@${message.author.id}>, posting invite links is prohibited by AutoMod!`).then(m => setTimeout(() => m.delete(), 4000));
+    if (!settings || !settings.autoModEnabled) return;
+
+    // استثناء المسؤولين
+    if (message.member.permissions.has(PermissionFlagsBits.Administrator) || message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+      return;
+    }
+
+    const contentLower = message.content.toLowerCase();
+    let isViolation = false;
+    let violationReason = '';
+
+    // 1. فحص الروابط
+    if (settings.antiLinks) {
+      const linkRegex = /(https?:\/\/|www\.|discord\.(gg|io|me|li)|discordapp\.com\/invite)/i;
+      if (linkRegex.test(contentLower)) {
+        isViolation = true;
+        violationReason = 'Posting prohibited links';
+      }
+    }
+
+    // 2. فحص الكلمات الممنوعة (Bad Words)
+    if (!isViolation && settings.badWords && settings.badWords.length > 0) {
+      for (const word of settings.badWords) {
+        if (word && contentLower.includes(word.toLowerCase())) {
+          isViolation = true;
+          violationReason = `Using prohibited word/phrase`;
+          break;
         }
+      }
+    }
+
+    // 3. تطبيق العقوبة عند اكتشاف مخالفة
+    if (isViolation) {
+      await message.delete().catch(() => {});
+
+      const member = message.member;
+      const pType = settings.punishmentType || 'timeout';
+      const durationMin = settings.timeoutDuration || 10;
+
+      if (pType === 'timeout') {
+        await member.timeout(durationMin * 60 * 1000, violationReason).catch(() => {});
+        message.channel.send(`🛡️ **AutoMod:** <@${member.id}> has been timed out for **${durationMin} minutes**. Reason: ${violationReason}`)
+          .then(m => setTimeout(() => m.delete().catch(() => {}), 5000));
+      } else if (pType === 'kick') {
+        await member.kick(violationReason).catch(() => {});
+        message.channel.send(`🛡️ **AutoMod:** <@${member.id}> was kicked from the server. Reason: ${violationReason}`)
+          .then(m => setTimeout(() => m.delete().catch(() => {}), 5000));
+      } else if (pType === 'ban') {
+        await member.ban({ reason: violationReason }).catch(() => {});
+        message.channel.send(`🛡️ **AutoMod:** <@${member.id}> was banned from the server. Reason: ${violationReason}`)
+          .then(m => setTimeout(() => m.delete().catch(() => {}), 5000));
+      } else {
+        message.channel.send(`⚠️ <@${member.id}>, your message was deleted. Reason: Prohibited content.`)
+          .then(m => setTimeout(() => m.delete().catch(() => {}), 4000));
       }
     }
 
@@ -111,11 +125,11 @@ client.on('messageCreate', async (message) => {
       return message.reply({ embeds: [mentionEmbed], components: [btnRow] });
     }
   } catch (err) {
-    console.error('Message Event Error:', err);
+    console.error('AutoMod Message Error:', err);
   }
 });
 
-// التفاعل مع الأوامر والأزرار (Tickets System)
+// معالجة التذاكر والأوامر
 client.on('interactionCreate', async (interaction) => {
   if (interaction.isChatInputCommand()) {
     const command = client.commands.get(interaction.commandName);
@@ -157,7 +171,6 @@ client.on('interactionCreate', async (interaction) => {
         ],
       };
 
-      // ربط الكاتيجوري من إعدادات الداشبورد إذا وُجد
       if (settings && settings.ticketCategory) {
         channelOptions.parent = settings.ticketCategory;
       }

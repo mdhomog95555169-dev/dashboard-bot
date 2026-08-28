@@ -22,13 +22,11 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-// صفحة اختيار السيرفر
 app.get('/dashboard', (req, res) => {
   if (!req.isAuthenticated()) return res.redirect('/login');
   res.render('dashboard-select', { user: req.user });
 });
 
-// عرض إعدادات السيرفر المحددة
 app.get('/dashboard/:guildID', async (req, res) => {
   try {
     if (!req.isAuthenticated()) return res.redirect('/login');
@@ -54,57 +52,33 @@ app.get('/dashboard/:guildID', async (req, res) => {
   }
 });
 
-// حفظ إعدادات الترحيب من الداشبورد
-app.post('/dashboard/:guildID/welcome', async (req, res) => {
-  try {
-    if (!req.isAuthenticated()) return res.redirect('/login');
-    const { welcomeChannel, welcomeMessage, autoRole } = req.body;
-
-    await Settings.findOneAndUpdate(
-      { guildId: req.params.guildID },
-      { welcomeChannel, welcomeMessage, autoRole },
-      { upsert: true }
-    );
-    res.redirect(`/dashboard/${req.params.guildID}?success=true`);
-  } catch (error) {
-    console.error('❌ Welcome Save Error:', error);
-    res.status(500).send('Error saving welcome settings.');
-  }
-});
-
-// حفظ إعدادات AutoMod من الداشبورد
+// حفظ إعدادات AutoMod الشاملة
 app.post('/dashboard/:guildID/automod', async (req, res) => {
   try {
     if (!req.isAuthenticated()) return res.redirect('/login');
-    const { autoModEnabled } = req.body;
+    const { autoModEnabled, antiLinks, badWordsInput, punishmentType, timeoutDuration } = req.body;
+
+    // تحويل الكلمات الممنوعة من النص إلى مصفوفة (Array) حتى 10 كلمات أو أكثر
+    let parsedBadWords = [];
+    if (badWordsInput) {
+      parsedBadWords = badWordsInput.split(',').map(word => word.trim().toLowerCase()).filter(w => w.length > 0);
+    }
 
     await Settings.findOneAndUpdate(
       { guildId: req.params.guildID },
-      { autoModEnabled: autoModEnabled === 'on' || autoModEnabled === true },
+      { 
+        autoModEnabled: autoModEnabled === 'on' || autoModEnabled === true,
+        antiLinks: antiLinks === 'on' || antiLinks === true,
+        badWords: parsedBadWords,
+        punishmentType: punishmentType || 'timeout',
+        timeoutDuration: parseInt(timeoutDuration) || 10
+      },
       { upsert: true }
     );
     res.redirect(`/dashboard/${req.params.guildID}?success=true`);
   } catch (error) {
     console.error('❌ AutoMod Save Error:', error);
     res.status(500).send('Error saving AutoMod settings.');
-  }
-});
-
-// حفظ إعدادات التذاكر من الداشبورد
-app.post('/dashboard/:guildID/tickets', async (req, res) => {
-  try {
-    if (!req.isAuthenticated()) return res.redirect('/login');
-    const { ticketCategory } = req.body;
-
-    await Settings.findOneAndUpdate(
-      { guildId: req.params.guildID },
-      { ticketCategory },
-      { upsert: true }
-    );
-    res.redirect(`/dashboard/${req.params.guildID}?success=true`);
-  } catch (error) {
-    console.error('❌ Ticket Save Error:', error);
-    res.status(500).send('Error saving Ticket settings.');
   }
 });
 
