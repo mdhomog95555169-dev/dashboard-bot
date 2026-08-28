@@ -19,19 +19,32 @@ for (const command of commands) {
   client.commands.set(command.data.name, command);
 }
 
+// تسجيل الأوامر عالمياً وفي كل سيرفر متواجد فيه البوت فوراً
 async function deployCommands() {
   try {
     const rest = new REST({ version: '10' }).setToken(config.token);
     const commandData = commands.map(cmd => cmd.data.toJSON());
     
-    console.log('⏳ Deploying All Slash Commands with Emojis Globally...');
+    console.log('⏳ Registering Commands Globally & Instant Guild Sync...');
+    
+    // تسجيل عالمي
     await rest.put(
       Routes.applicationCommands(config.clientId),
       { body: commandData }
     );
-    console.log('✅ All Slash Commands Deployed Successfully!');
+
+    // تسجيل فوري لكافة السيرفرات الحالية
+    const guilds = client.guilds.cache.map(g => g.id);
+    for (const guildId of guilds) {
+      await rest.put(
+        Routes.applicationGuildCommands(config.clientId, guildId),
+        { body: commandData }
+      ).catch(() => {});
+    }
+
+    console.log(`✅ All ${commands.length} Commands Synced Instantly Across All Guilds!`);
   } catch (error) {
-    console.error('❌ Error registering slash commands:', error);
+    console.error('❌ Error deploying slash commands:', error);
   }
 }
 
@@ -44,63 +57,67 @@ client.once('ready', async () => {
   dashboard.listen(PORT, () => console.log(`🌐 Dashboard running on port ${PORT}`));
 });
 
+client.on('guildCreate', async (guild) => {
+  const rest = new REST({ version: '10' }).setToken(config.token);
+  const commandData = commands.map(cmd => cmd.data.toJSON());
+  await rest.put(
+    Routes.applicationGuildCommands(config.clientId, guild.id),
+    { body: commandData }
+  ).catch(() => {});
+});
+
 client.on('interactionCreate', async (interaction) => {
   if (interaction.isChatInputCommand()) {
     const command = client.commands.get(interaction.commandName);
     if (command) await command.execute(interaction).catch(console.error);
   } 
   else if (interaction.isStringSelectMenu()) {
-    // 📩 قائمة اختيار الأقسام المساعدة التفصيلية الخافية (X1000 Extended Private Reply)
     if (interaction.customId === 'help_category_select') {
       const selected = interaction.values[0];
       let title = '';
       let desc = '';
 
       if (selected === 'help_mod') {
-        title = '🛡️ Moderation & Security Management Suite';
+        title = '🛡️ Moderation & Security Suite';
         desc = 
-          '**Detailed Command Specifications:**\n\n' +
-          '• `/ban` - 🔨 **Ban User**\n  *Syntax:* `/ban user:@target reason:[text]`\n  *Permission:* `Ban Members`\n\n' +
-          '• `/unban` - 🔓 **Unban User**\n  *Syntax:* `/unban userid:[ID]`\n  *Permission:* `Ban Members`\n\n' +
-          '• `/kick` - 👢 **Kick User**\n  *Syntax:* `/kick user:@target reason:[text]`\n  *Permission:* `Kick Members`\n\n' +
-          '• `/timeout` - 🔇 **Mute/Timeout Member**\n  *Syntax:* `/timeout user:@target duration:[minutes] reason:[text]`\n  *Permission:* `Moderate Members`\n\n' +
-          '• `/untimeout` - 🔊 **Remove Timeout**\n  *Syntax:* `/untimeout user:@target`\n  *Permission:* `Moderate Members`\n\n' +
-          '• `/warn` - ⚠️ **Issue Warning**\n  *Syntax:* `/warn user:@target reason:[text]`\n  *Permission:* `Manage Messages`\n\n' +
-          '• `/clear` - 🧹 **Purge Messages**\n  *Syntax:* `/clear amount:[1-100]`\n  *Permission:* `Manage Messages`\n\n' +
-          '• `/role-add` - ➕ **Add Role**\n  *Syntax:* `/role-add user:@target role:@role`\n  *Permission:* `Manage Roles`\n\n' +
-          '• `/role-remove` - ➖ **Remove Role**\n  *Syntax:* `/role-remove user:@target role:@role`\n  *Permission:* `Manage Roles`\n\n' +
-          '• `/vkick` - 🎙️ **Voice Kick**\n  *Syntax:* `/vkick user:@target`\n  *Permission:* `Move Members`\n\n' +
-          '• `/vmove` - ↗️ **Voice Move**\n  *Syntax:* `/vmove user:@target channel:[#voice]`\n  *Permission:* `Move Members`\n\n' +
-          '• `/vmute` - 🎙️ **Voice Mute**\n  *Syntax:* `/vmute user:@target`\n  *Permission:* `Mute Members`\n\n' +
-          '• `/vunmute` - 🔊 **Voice Unmute**\n  *Syntax:* `/vunmute user:@target`\n  *Permission:* `Mute Members`\n\n' +
-          '• `/vdeaf` - 🎧 **Voice Deafen**\n  *Syntax:* `/vdeaf user:@target`\n  *Permission:* `Deafen Members`\n\n' +
-          '• `/vundeaf` - 🎧 **Voice Undeafen**\n  *Syntax:* `/vundeaf user:@target`\n  *Permission:* `Deafen Members`';
+          '• `/ban` - 🔨 Ban User\n' +
+          '• `/unban` - 🔓 Unban User by ID\n' +
+          '• `/kick` - 👢 Kick User\n' +
+          '• `/timeout` - 🔇 Timeout/Mute Member\n' +
+          '• `/untimeout` - 🔊 Remove Timeout\n' +
+          '• `/warn` - ⚠️ Issue Warning\n' +
+          '• `/clear` - 🧹 Purge Messages\n' +
+          '• `/role-add` - ➕ Assign Role\n' +
+          '• `/role-remove` - ➖ Remove Role\n' +
+          '• `/vkick` - 🎙️ Kick from Voice\n' +
+          '• `/vmove` - ↗️ Move Voice Member\n' +
+          '• `/vmute` - 🎙️ Mute in Voice\n' +
+          '• `/vunmute` - 🔊 Unmute in Voice\n' +
+          '• `/vdeaf` - 🎧 Deafen in Voice\n' +
+          '• `/vundeaf` - 🎧 Undeafen in Voice';
       } else if (selected === 'help_chan') {
-        title = '🔒 Channel Management & Protection Controls';
+        title = '🔒 Channel Controls';
         desc = 
-          '**Detailed Command Specifications:**\n\n' +
-          '• `/lock` - 🔒 **Lock Channel**\n  *Denies @everyone permission to send messages in current channel.*\n\n' +
-          '• `/unlock` - 🔓 **Unlock Channel**\n  *Restores @everyone permission to send messages.*\n\n' +
-          '• `/hide` - 👁️‍🗨️ **Hide Channel**\n  *Hides channel visibility from standard members.*\n\n' +
-          '• `/unhide` - 👁️ **Unhide Channel**\n  *Restores channel visibility to standard members.*\n\n' +
-          '• `/slowmode` - ⏳ **Channel Slowmode**\n  *Syntax:* `/slowmode seconds:[0-21600]`\n  *Sets message cooldown timer per member.*';
+          '• `/lock` - 🔒 Lock Text Channel\n' +
+          '• `/unlock` - 🔓 Unlock Text Channel\n' +
+          '• `/hide` - 👁️‍🗨️ Hide Channel\n' +
+          '• `/unhide` - 👁️ Show Channel\n' +
+          '• `/slowmode` - ⏳ Set Slowmode Delay';
       } else if (selected === 'help_util') {
-        title = '⚙️ Utility & System Information';
+        title = '⚙️ Utility & Profile';
         desc = 
-          '**Detailed Command Specifications:**\n\n' +
-          '• `/user` - 👤 **User Profile Info**\n  *Syntax:* `/user user:[@optional]`\n  *Displays target or author user ID, tag, and account details.*\n\n' +
-          '• `/help` - 📖 **System Documentation**\n  *Launches this interactive help menu with full category choices.*';
+          '• `/user` - 👤 View User Profile & ID\n' +
+          '• `/help` - 📖 Display Documentation';
       }
 
       const categoryEmbed = new EmbedBuilder()
         .setTitle(title)
         .setDescription(desc)
         .setColor('#2f3136')
-        .setFooter({ text: 'Oscorp Control Systems • Private Security Response' });
+        .setFooter({ text: 'Oscorp Control Systems' });
 
       await interaction.reply({ embeds: [categoryEmbed], ephemeral: true });
     }
-    // معالجة اختيار التذاكر
     else if (interaction.customId === 'custom_ticket_select') {
       const ticketName = `ticket-${interaction.user.username}`;
       const existingChannel = interaction.guild.channels.cache.find(c => c.name === ticketName);
@@ -127,7 +144,7 @@ client.on('interactionCreate', async (interaction) => {
 
       const ticketEmbed = new EmbedBuilder()
         .setTitle(`🎟️ New Support Ticket`)
-        .setDescription(`Hello <@${interaction.user.id}>!\nPlease specify your issue or request below and support team will assist you shortly.`)
+        .setDescription(`Hello <@${interaction.user.id}>!\nPlease specify your issue below and our support team will respond shortly.`)
         .setColor('#2f3136');
 
       const closeBtn = new ActionRowBuilder().addComponents(

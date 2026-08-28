@@ -2,15 +2,15 @@ const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder
 
 module.exports = {
   commands: [
-    // 🎟️ 1. Ticket Setup Command
+    // 🎟️ 1. Ticket Setup
     {
       data: new SlashCommandBuilder()
         .setName('ticket-setup')
-        .setDescription('🎫 Create a fully customized support ticket panel with icons & banners')
+        .setDescription('🎫 Create a fully customized support ticket panel')
         .addStringOption(opt => opt.setName('title').setDescription('📌 Embed Title').setRequired(true))
         .addStringOption(opt => opt.setName('description').setDescription('📝 Embed Description & Rules').setRequired(true))
-        .addStringOption(opt => opt.setName('icon_url').setDescription('🖼️ Small Header Icon URL (Thumbnail)').setRequired(false))
-        .addStringOption(opt => opt.setName('banner_url').setDescription('🖼️ Large Bottom Banner Image URL').setRequired(false))
+        .addStringOption(opt => opt.setName('icon_url').setDescription('🖼️ Header Icon URL (Thumbnail)').setRequired(false))
+        .addStringOption(opt => opt.setName('banner_url').setDescription('🖼️ Large Banner Image URL').setRequired(false))
         .addStringOption(opt => opt.setName('cat1_label').setDescription('📂 Category 1 Name').setRequired(true))
         .addStringOption(opt => opt.setName('cat1_emoji').setDescription('✨ Category 1 Emoji').setRequired(false))
         .addStringOption(opt => opt.setName('cat2_label').setDescription('📂 Category 2 Name').setRequired(false))
@@ -51,40 +51,39 @@ module.exports = {
         const selectMenu = new ActionRowBuilder().addComponents(
           new StringSelectMenuBuilder()
             .setCustomId('custom_ticket_select')
-            .setPlaceholder(' Choose Ticket Category / اختر نوع التذكرة...')
+            .setPlaceholder('Choose Ticket Category / اختر نوع التذكرة...')
             .addOptions(options)
         );
 
         await interaction.channel.send({ embeds: [ticketEmbed], components: [selectMenu] });
-        await interaction.reply({ content: '✅ **Ticket Setup Panel created successfully!**', ephemeral: true });
+        await interaction.reply({ content: '✅ **Ticket Panel created successfully!**', ephemeral: true });
       }
     },
 
-    // 📖 2. Advanced & Extended /help Command (X1000 Help System)
+    // 📖 2. Extended Help Command
     {
       data: new SlashCommandBuilder()
         .setName('help')
-        .setDescription('📖 Open the advanced system documentation and command center'),
+        .setDescription('📖 Open system instructions & interactive command menu'),
       async execute(interaction) {
         const helpEmbed = new EmbedBuilder()
-          .setTitle('⚙️ Oscorp System Command & Documentation Hub')
+          .setTitle('⚙️ Oscorp System Command Hub')
           .setDescription(
-            'Welcome to the official Oscorp Management System.\n\n' +
-            '**System Status:** 🟢 All 21 Modules Operational\n' +
-            '**Access Level:** Administrator & Moderator Commands Enabled\n\n' +
-            ' Please select a category from the dropdown menu below to view detailed command lists, syntax, required permissions, and usage guides.'
+            'Welcome to Oscorp System Dashboard.\n\n' +
+            '**System Status:** 🟢 All 21 Modules Active\n\n' +
+            'Select a command category below to view commands syntax and permissions.'
           )
           .setColor('#2f3136')
-          .setFooter({ text: 'Oscorp Security & Administration Systems • Powered by ProBot Standard Engine' });
+          .setFooter({ text: 'Oscorp Security Systems' });
 
         const helpMenu = new ActionRowBuilder().addComponents(
           new StringSelectMenuBuilder()
             .setCustomId('help_category_select')
-            .setPlaceholder('Select Command Suite...')
+            .setPlaceholder('Select Command Category...')
             .addOptions([
-              { label: 'Moderation & Security (15 Commands)', description: 'Member management, bans, mutes, warnings & voice controls', value: 'help_mod', emoji: '🛡️' },
-              { label: 'Channel & Protection Controls (5 Commands)', description: 'Lockdown, hiding, slowmode and channel tools', value: 'help_chan', emoji: '🔒' },
-              { label: 'Utility & System Information (1 Command)', description: 'User lookup, ID verification and bot statistics', value: 'help_util', emoji: '⚙️' }
+              { label: 'Moderation Suite', description: 'Ban, Kick, Timeout, Warn & Voice controls', value: 'help_mod', emoji: '🛡️' },
+              { label: 'Channel Management', description: 'Lock, Unlock, Hide, Unhide & Slowmode', value: 'help_chan', emoji: '🔒' },
+              { label: 'Utility Controls', description: 'User info and system utilities', value: 'help_util', emoji: '⚙️' }
             ])
         );
 
@@ -92,44 +91,44 @@ module.exports = {
       }
     },
 
-    // 🛡️ 3. All 21 Moderation & Management Commands with Emojis in Descriptions
+    // 🛡️ 3. Moderation & Administration Commands (21 Total Commands)
     {
-      data: new SlashCommandBuilder().setName('ban').setDescription('🔨 Ban a user permanently from the server')
+      data: new SlashCommandBuilder().setName('ban').setDescription('🔨 Ban a user permanently')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
-        .addStringOption(opt => opt.setName('reason').setDescription('📝 Reason for Ban'))
+        .addStringOption(opt => opt.setName('reason').setDescription('📝 Reason'))
         .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
       async execute(interaction) {
         const user = interaction.options.getUser('user');
         const reason = interaction.options.getString('reason') || 'No reason provided';
         await interaction.guild.members.ban(user, { reason }).catch(() => {});
-        await interaction.reply({ content: `✅ **Successfully banned ${user.tag}** | Reason: ${reason}` });
+        await interaction.reply({ content: `✅ **Banned ${user.tag}** | Reason: ${reason}` });
       }
     },
     {
-      data: new SlashCommandBuilder().setName('unban').setDescription('🔓 Revoke a user ban using their Discord ID')
-        .addStringOption(opt => opt.setName('userid').setDescription('🆔 Target User ID').setRequired(true))
+      data: new SlashCommandBuilder().setName('unban').setDescription('🔓 Unban a user by ID')
+        .addStringOption(opt => opt.setName('userid').setDescription('🆔 User ID').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
       async execute(interaction) {
         const userId = interaction.options.getString('userid');
         await interaction.guild.members.unban(userId).catch(() => {});
-        await interaction.reply({ content: `✅ **Successfully unbanned User ID:** \`${userId}\`` });
+        await interaction.reply({ content: `✅ **Unbanned User ID:** \`${userId}\`` });
       }
     },
     {
-      data: new SlashCommandBuilder().setName('kick').setDescription('👢 Kick a user out of the server')
+      data: new SlashCommandBuilder().setName('kick').setDescription('👢 Kick a member from server')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
-        .addStringOption(opt => opt.setName('reason').setDescription('📝 Reason for Kick'))
+        .addStringOption(opt => opt.setName('reason').setDescription('📝 Reason'))
         .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers),
       async execute(interaction) {
         const member = interaction.options.getMember('user');
         const user = interaction.options.getUser('user');
         const reason = interaction.options.getString('reason') || 'No reason provided';
         if (member) await member.kick(reason).catch(() => {});
-        await interaction.reply({ content: `✅ **Successfully kicked ${user.tag}** | Reason: ${reason}` });
+        await interaction.reply({ content: `✅ **Kicked ${user.tag}** | Reason: ${reason}` });
       }
     },
     {
-      data: new SlashCommandBuilder().setName('timeout').setDescription('🔇 Mute/Timeout a member for a specified duration')
+      data: new SlashCommandBuilder().setName('timeout').setDescription('🔇 Mute/Timeout a member')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
         .addIntegerOption(opt => opt.setName('duration').setDescription('⏱️ Duration in Minutes').setRequired(true))
         .addStringOption(opt => opt.setName('reason').setDescription('📝 Reason'))
@@ -139,23 +138,23 @@ module.exports = {
         const duration = interaction.options.getInteger('duration');
         const reason = interaction.options.getString('reason') || 'No reason provided';
         if (member) await member.timeout(duration * 60 * 1000, reason).catch(() => {});
-        await interaction.reply({ content: `🔇 **Muted ${member ? member.user.tag : 'user'} for ${duration} minute(s).** | Reason: ${reason}` });
+        await interaction.reply({ content: `🔇 **Muted ${member ? member.user.tag : 'user'} for ${duration} minute(s)**` });
       }
     },
     {
-      data: new SlashCommandBuilder().setName('untimeout').setDescription('🔊 Remove active timeout/mute from a member')
+      data: new SlashCommandBuilder().setName('untimeout').setDescription('🔊 Remove timeout from a member')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
       async execute(interaction) {
         const member = interaction.options.getMember('user');
         if (member) await member.timeout(null).catch(() => {});
-        await interaction.reply({ content: `🔊 **Removed timeout from ${member ? member.user.tag : 'user'}.**` });
+        await interaction.reply({ content: `🔊 **Removed timeout from ${member ? member.user.tag : 'user'}**` });
       }
     },
     {
-      data: new SlashCommandBuilder().setName('warn').setDescription('⚠️ Issue a official warning to a member')
+      data: new SlashCommandBuilder().setName('warn').setDescription('⚠️ Issue warning to a member')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
-        .addStringOption(opt => opt.setName('reason').setDescription('📝 Reason for Warning').setRequired(true))
+        .addStringOption(opt => opt.setName('reason').setDescription('📝 Reason').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
       async execute(interaction) {
         const user = interaction.options.getUser('user');
@@ -164,8 +163,8 @@ module.exports = {
       }
     },
     {
-      data: new SlashCommandBuilder().setName('clear').setDescription('🧹 Purge a specified amount of messages from channel')
-        .addIntegerOption(opt => opt.setName('amount').setDescription('🔢 Amount of messages (1-100)').setRequired(true))
+      data: new SlashCommandBuilder().setName('clear').setDescription('🧹 Purge channel messages')
+        .addIntegerOption(opt => opt.setName('amount').setDescription('🔢 Amount (1-100)').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
       async execute(interaction) {
         const amount = interaction.options.getInteger('amount');
@@ -174,23 +173,23 @@ module.exports = {
       }
     },
     {
-      data: new SlashCommandBuilder().setName('lock').setDescription('🔒 Lock down the current text channel')
+      data: new SlashCommandBuilder().setName('lock').setDescription('🔒 Lock text channel')
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
       async execute(interaction) {
         await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { SendMessages: false }).catch(() => {});
-        await interaction.reply({ content: `🔒 **Channel Locked:** <#${interaction.channel.id}>` });
+        await interaction.reply({ content: `🔒 **Channel Locked.**` });
       }
     },
     {
-      data: new SlashCommandBuilder().setName('unlock').setDescription('🔓 Unlock the current text channel')
+      data: new SlashCommandBuilder().setName('unlock').setDescription('🔓 Unlock text channel')
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
       async execute(interaction) {
         await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { SendMessages: true }).catch(() => {});
-        await interaction.reply({ content: `🔓 **Channel Unlocked:** <#${interaction.channel.id}>` });
+        await interaction.reply({ content: `🔓 **Channel Unlocked.**` });
       }
     },
     {
-      data: new SlashCommandBuilder().setName('hide').setDescription('👁️‍🗨️ Hide the current channel from members')
+      data: new SlashCommandBuilder().setName('hide').setDescription('👁️‍🗨️ Hide channel from members')
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
       async execute(interaction) {
         await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { ViewChannel: false }).catch(() => {});
@@ -198,7 +197,7 @@ module.exports = {
       }
     },
     {
-      data: new SlashCommandBuilder().setName('unhide').setDescription('👁️ Make the current channel visible to members')
+      data: new SlashCommandBuilder().setName('unhide').setDescription('👁️ Make channel visible')
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
       async execute(interaction) {
         await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { ViewChannel: true }).catch(() => {});
@@ -206,8 +205,8 @@ module.exports = {
       }
     },
     {
-      data: new SlashCommandBuilder().setName('slowmode').setDescription('⏳ Adjust slowmode rate limit for current channel')
-        .addIntegerOption(opt => opt.setName('seconds').setDescription('⏱️ Seconds delay').setRequired(true))
+      data: new SlashCommandBuilder().setName('slowmode').setDescription('⏳ Set channel slowmode seconds')
+        .addIntegerOption(opt => opt.setName('seconds').setDescription('⏱️ Seconds').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
       async execute(interaction) {
         const seconds = interaction.options.getInteger('seconds');
@@ -216,21 +215,21 @@ module.exports = {
       }
     },
     {
-      data: new SlashCommandBuilder().setName('vkick').setDescription('🎙️ Disconnect a member from voice channel')
+      data: new SlashCommandBuilder().setName('vkick').setDescription('🎙️ Kick user from voice channel')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.MoveMembers),
       async execute(interaction) {
         const member = interaction.options.getMember('user');
         if (member && member.voice.channel) {
           await member.voice.setChannel(null).catch(() => {});
-          await interaction.reply({ content: `🔊 **Kicked ${member.user.tag} from voice channel.**` });
+          await interaction.reply({ content: `🔊 **Kicked ${member.user.tag} from voice.**` });
         } else {
-          await interaction.reply({ content: `❌ Member is not connected to any voice channel.` });
+          await interaction.reply({ content: `❌ Member is not in a voice channel.` });
         }
       }
     },
     {
-      data: new SlashCommandBuilder().setName('vmove').setDescription('↗️ Move member to another voice channel')
+      data: new SlashCommandBuilder().setName('vmove').setDescription('↗️ Move member to voice channel')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
         .addChannelOption(opt => opt.setName('channel').setDescription('🔊 Target Voice Channel').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.MoveMembers),
@@ -239,14 +238,14 @@ module.exports = {
         const channel = interaction.options.getChannel('channel');
         if (member && member.voice.channel) {
           await member.voice.setChannel(channel).catch(() => {});
-          await interaction.reply({ content: `🔊 **Moved ${member.user.tag} to requested channel.**` });
+          await interaction.reply({ content: `🔊 **Moved ${member.user.tag}.**` });
         } else {
-          await interaction.reply({ content: `❌ Member is not connected to a voice channel.` });
+          await interaction.reply({ content: `❌ Member is not in a voice channel.` });
         }
       }
     },
     {
-      data: new SlashCommandBuilder().setName('vmute').setDescription('🎙️ Mute a member in voice channel')
+      data: new SlashCommandBuilder().setName('vmute').setDescription('🎙️ Mute member in voice')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.MuteMembers),
       async execute(interaction) {
@@ -260,7 +259,7 @@ module.exports = {
       }
     },
     {
-      data: new SlashCommandBuilder().setName('vunmute').setDescription('🔊 Unmute a member in voice channel')
+      data: new SlashCommandBuilder().setName('vunmute').setDescription('🔊 Unmute member in voice')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.MuteMembers),
       async execute(interaction) {
@@ -274,7 +273,7 @@ module.exports = {
       }
     },
     {
-      data: new SlashCommandBuilder().setName('vdeaf').setDescription('🎧 Deafen a member in voice channel')
+      data: new SlashCommandBuilder().setName('vdeaf').setDescription('🎧 Deafen member in voice')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.DeafenMembers),
       async execute(interaction) {
@@ -288,7 +287,7 @@ module.exports = {
       }
     },
     {
-      data: new SlashCommandBuilder().setName('vundeaf').setDescription('🎧 Undeafen a member in voice channel')
+      data: new SlashCommandBuilder().setName('vundeaf').setDescription('🎧 Undeafen member in voice')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.DeafenMembers),
       async execute(interaction) {
@@ -302,32 +301,32 @@ module.exports = {
       }
     },
     {
-      data: new SlashCommandBuilder().setName('role-add').setDescription('➕ Assign a role to a member')
+      data: new SlashCommandBuilder().setName('role-add').setDescription('➕ Add role to member')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
-        .addRoleOption(opt => opt.setName('role').setDescription('🎭 Role to Assign').setRequired(true))
+        .addRoleOption(opt => opt.setName('role').setDescription('🎭 Role').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles),
       async execute(interaction) {
         const member = interaction.options.getMember('user');
         const role = interaction.options.getRole('role');
         if (member) await member.roles.add(role).catch(() => {});
-        await interaction.reply({ content: `✅ **Added role \`${role.name}\` to ${member ? member.user.tag : 'user'}.**` });
+        await interaction.reply({ content: `✅ **Added role \`${role.name}\`.**` });
       }
     },
     {
-      data: new SlashCommandBuilder().setName('role-remove').setDescription('➖ Remove a role from a member')
+      data: new SlashCommandBuilder().setName('role-remove').setDescription('➖ Remove role from member')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
-        .addRoleOption(opt => opt.setName('role').setDescription('🎭 Role to Remove').setRequired(true))
+        .addRoleOption(opt => opt.setName('role').setDescription('🎭 Role').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles),
       async execute(interaction) {
         const member = interaction.options.getMember('user');
         const role = interaction.options.getRole('role');
         if (member) await member.roles.remove(role).catch(() => {});
-        await interaction.reply({ content: `✅ **Removed role \`${role.name}\` from ${member ? member.user.tag : 'user'}.**` });
+        await interaction.reply({ content: `✅ **Removed role \`${role.name}\`.**` });
       }
     },
     {
-      data: new SlashCommandBuilder().setName('user').setDescription('👤 View detailed member profile information')
-        .addUserOption(opt => opt.setName('user').setDescription('👤 Target User (Optional)')),
+      data: new SlashCommandBuilder().setName('user').setDescription('👤 View member profile & ID')
+        .addUserOption(opt => opt.setName('user').setDescription('👤 Target User')),
       async execute(interaction) {
         const user = interaction.options.getUser('user') || interaction.user;
         await interaction.reply({ content: `👤 **User Info:** ${user.tag} | 🆔 ID: \`${user.id}\`` });
