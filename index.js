@@ -39,32 +39,23 @@ client.once('ready', async () => {
   await deployCommands();
 
   const PORT = process.env.PORT || 3000;
-  dashboard.listen(PORT, () => console.log(`🌐 Dashboard on port ${PORT}`));
+  dashboard.listen(PORT, () => console.log(`🌐 Dashboard running on port ${PORT}`));
 });
 
-// معالجة القوائم والتفاعلات للتذاكر
+// معالجة التفاعل مع القوائم المخصصة للتذاكر والأزرار
 client.on('interactionCreate', async (interaction) => {
   if (interaction.isChatInputCommand()) {
     const command = client.commands.get(interaction.commandName);
     if (command) await command.execute(interaction).catch(console.error);
   } 
   else if (interaction.isStringSelectMenu()) {
-    if (interaction.customId === 'select_ticket_category') {
-      const selectedCategory = interaction.values[0];
-      const categoryNames = {
-        help: 'help',
-        complaint: 'complaint',
-        billing: 'billing',
-        suggestion: 'suggestion',
-        rewards: 'rewards',
-        other: 'other'
-      };
-
-      const ticketName = `${categoryNames[selectedCategory]}-${interaction.user.username}`;
+    if (interaction.customId === 'custom_ticket_select') {
+      const selectedValue = interaction.values[0]; // cat_1, cat_2, cat_3
+      const ticketName = `ticket-${interaction.user.username}`;
       const existingChannel = interaction.guild.channels.cache.find(c => c.name === ticketName);
 
       if (existingChannel) {
-        return interaction.reply({ content: `❌ You already have an open ticket in this category: ${existingChannel}`, ephemeral: true });
+        return interaction.reply({ content: `❌ You already have an open ticket: ${existingChannel}`, ephemeral: true });
       }
 
       const settings = await Settings.findOne({ guildId: interaction.guild.id });
@@ -90,8 +81,8 @@ client.on('interactionCreate', async (interaction) => {
       const channel = await interaction.guild.channels.create(channelOptions);
 
       const ticketEmbed = new EmbedBuilder()
-        .setTitle(`🎟️ Support Ticket (${selectedCategory.toUpperCase()})`)
-        .setDescription(`Hello <@${interaction.user.id}>!\nThank you for reaching out. Please state your issue or request here, and staff will assist you shortly.`)
+        .setTitle(`🎟️ Support Ticket`)
+        .setDescription(`Hello <@${interaction.user.id}>!\nWelcome to your support ticket. Please explain your inquiry or problem here.`)
         .setColor('#5865F2')
         .setFooter({ text: 'Oscorp Ticket System' });
 
@@ -104,7 +95,7 @@ client.on('interactionCreate', async (interaction) => {
       );
 
       await channel.send({ embeds: [ticketEmbed], components: [closeBtn] });
-      await interaction.reply({ content: `✅ Ticket created in category **${selectedCategory}**: ${channel}`, ephemeral: true });
+      await interaction.reply({ content: `✅ Ticket created successfully: ${channel}`, ephemeral: true });
     }
   } 
   else if (interaction.isButton()) {
