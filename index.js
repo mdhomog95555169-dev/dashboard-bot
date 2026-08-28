@@ -19,17 +19,20 @@ for (const command of commands) {
   client.commands.set(command.data.name, command);
 }
 
+// تسجيل الأوامر عالمياً وللسيرفرات مباشرة
 async function deployCommands() {
   try {
     const rest = new REST({ version: '10' }).setToken(config.token);
     const commandData = commands.map(cmd => cmd.data.toJSON());
+    
+    console.log('⏳ Registering Global Slash Commands...');
     await rest.put(
       Routes.applicationCommands(config.clientId),
       { body: commandData }
     );
-    console.log('✅ Commands Registered Successfully!');
+    console.log('✅ All 21 Slash Commands Successfully Deployed Globally!');
   } catch (error) {
-    console.error('❌ Error registering commands:', error);
+    console.error('❌ Error registering slash commands:', error);
   }
 }
 
@@ -42,36 +45,37 @@ client.once('ready', async () => {
   dashboard.listen(PORT, () => console.log(`🌐 Dashboard running on port ${PORT}`));
 });
 
-// التعامل مع التفاعلات والـ Select Menus
 client.on('interactionCreate', async (interaction) => {
   if (interaction.isChatInputCommand()) {
     const command = client.commands.get(interaction.commandName);
     if (command) await command.execute(interaction).catch(console.error);
   } 
   else if (interaction.isStringSelectMenu()) {
-    // معالجة اختيار أقسام المساعدة /help
+    // 📩 قائمة اختيار الأقسام المساعدة تصبح خاصة (Ephemeral - Private)
     if (interaction.customId === 'help_category_select') {
       const selected = interaction.values[0];
       let title = '';
       let desc = '';
 
       if (selected === 'help_mod') {
-        title = '🛡️ أوامر الإشراف والأعضاء (Moderation)';
-        desc = '`/ban` - حظر عضو\n`/unban` - إلغاء حظر\n`/kick` - طرد عضو\n`/timeout` - إعطاء تايم أوت\n`/untimeout` - فك التايم أوت\n`/warn` - تحذير عضو\n`/clear` - مسح الرسائل\n`/role-add` - إضافة رتبة\n`/role-remove` - إزالة رتبة\n`/vkick` - طرد صوتي\n`/vmove` - نقل صوتي\n`/vmute` - كتم صوتي\n`/vunmute` - فك الكتم الصوتي\n`/vdeaf` - صمم صوتي\n`/vundeaf` - فك الصمم الصوتي';
+        title = '🛡️ Moderation & Security Commands';
+        desc = '`/ban` - Ban a user from the server\n`/unban` - Remove ban by ID\n`/kick` - Kick a user\n`/timeout` - Timeout member\n`/untimeout` - Remove timeout\n`/warn` - Issue a warning\n`/clear` - Purge messages\n`/role-add` - Add role to user\n`/role-remove` - Remove role from user\n`/vkick` - Kick from voice\n`/vmove` - Move voice member\n`/vmute` - Mute in voice\n`/vunmute` - Unmute in voice\n`/vdeaf` - Deafen in voice\n`/vundeaf` - Undeafen in voice';
       } else if (selected === 'help_chan') {
-        title = '🔒 أوامر القنوات (Channels)';
-        desc = '`/lock` - قفل القناة\n`/unlock` - فتح القناة\n`/hide` - إخفاء القناة\n`/unhide` - إظهار القناة\n`/slowmode` - وضع البطء';
+        title = '🔒 Channel Management Commands';
+        desc = '`/lock` - Lock current channel\n`/unlock` - Unlock channel\n`/hide` - Hide channel from members\n`/unhide` - Show channel to members\n`/slowmode` - Set slowmode timer';
       } else if (selected === 'help_util') {
-        title = '⚙️ الأوامر العامة والمعلومات (Utility)';
-        desc = '`/user` - عرض معلومات حسابك أو حساب آخر\n`/help` - عرض قائمة الأوامر المتاحة';
+        title = '⚙️ Utility & System Commands';
+        desc = '`/user` - Display member profile & ID\n`/help` - Show instructions & commands hub';
       }
 
       const categoryEmbed = new EmbedBuilder()
         .setTitle(title)
         .setDescription(desc)
-        .setColor('#2f3136');
+        .setColor('#2f3136')
+        .setFooter({ text: 'Oscorp Control Systems' });
 
-      await interaction.reply({ embeds: [categoryEmbed] });
+      // إرسال رد خاص يراه المستخدم فقط (Private Message / Ephemeral)
+      await interaction.reply({ embeds: [categoryEmbed], ephemeral: true });
     }
     // معالجة اختيار التذاكر
     else if (interaction.customId === 'custom_ticket_select') {
@@ -79,7 +83,7 @@ client.on('interactionCreate', async (interaction) => {
       const existingChannel = interaction.guild.channels.cache.find(c => c.name === ticketName);
 
       if (existingChannel) {
-        return interaction.reply({ content: `❌ **لديك تذكرة مفتوحة بالفعل:** ${existingChannel}` });
+        return interaction.reply({ content: `❌ **You already have an open ticket:** ${existingChannel}`, ephemeral: true });
       }
 
       const settings = await Settings.findOne({ guildId: interaction.guild.id });
@@ -99,25 +103,25 @@ client.on('interactionCreate', async (interaction) => {
       const channel = await interaction.guild.channels.create(channelOptions);
 
       const ticketEmbed = new EmbedBuilder()
-        .setTitle(`🎟️ تذكرة دعم جديدة`)
-        .setDescription(`أهلاً بك <@${interaction.user.id}>!\nيرجى طرح مشكلتك أو استفسارك هنا، وسيقوم فريق الدعم بمساعدتك قريبًا.`)
+        .setTitle(`🎟️ New Support Ticket`)
+        .setDescription(`Hello <@${interaction.user.id}>!\nPlease specify your issue or request below and support team will assist you shortly.`)
         .setColor('#2f3136');
 
       const closeBtn = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId('close_ticket')
-          .setLabel('إغلاق التذكرة')
+          .setLabel('Close Ticket')
           .setStyle(ButtonStyle.Danger)
           .setEmoji('🔒')
       );
 
       await channel.send({ embeds: [ticketEmbed], components: [closeBtn] });
-      await interaction.reply({ content: `✅ **تم إنشاء تذكرتك بنجاح:** ${channel}` });
+      await interaction.reply({ content: `✅ **Ticket created successfully:** ${channel}`, ephemeral: true });
     }
   } 
   else if (interaction.isButton()) {
     if (interaction.customId === 'close_ticket') {
-      await interaction.reply({ content: '🔒 **جاري إغلاق التذكرة خلال 5 ثوانٍ...**' });
+      await interaction.reply({ content: '🔒 **Closing ticket in 5 seconds...**' });
       setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
     }
   }
