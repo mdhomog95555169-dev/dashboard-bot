@@ -27,7 +27,7 @@ async function deployCommands() {
       Routes.applicationCommands(config.clientId),
       { body: commandData }
     );
-    console.log('✅ Commands Registered!');
+    console.log('✅ Commands Registered Successfully!');
   } catch (error) {
     console.error('❌ Error registering commands:', error);
   }
@@ -42,14 +42,39 @@ client.once('ready', async () => {
   dashboard.listen(PORT, () => console.log(`🌐 Dashboard running on port ${PORT}`));
 });
 
-// التعامل مع جميع التفاعلات (أوامر ورسائل عامة مثل ProBot)
+// التعامل مع التفاعلات والـ Select Menus
 client.on('interactionCreate', async (interaction) => {
   if (interaction.isChatInputCommand()) {
     const command = client.commands.get(interaction.commandName);
     if (command) await command.execute(interaction).catch(console.error);
   } 
   else if (interaction.isStringSelectMenu()) {
-    if (interaction.customId === 'custom_ticket_select') {
+    // معالجة اختيار أقسام المساعدة /help
+    if (interaction.customId === 'help_category_select') {
+      const selected = interaction.values[0];
+      let title = '';
+      let desc = '';
+
+      if (selected === 'help_mod') {
+        title = '🛡️ أوامر الإشراف والأعضاء (Moderation)';
+        desc = '`/ban` - حظر عضو\n`/unban` - إلغاء حظر\n`/kick` - طرد عضو\n`/timeout` - إعطاء تايم أوت\n`/untimeout` - فك التايم أوت\n`/warn` - تحذير عضو\n`/clear` - مسح الرسائل\n`/role-add` - إضافة رتبة\n`/role-remove` - إزالة رتبة\n`/vkick` - طرد صوتي\n`/vmove` - نقل صوتي\n`/vmute` - كتم صوتي\n`/vunmute` - فك الكتم الصوتي\n`/vdeaf` - صمم صوتي\n`/vundeaf` - فك الصمم الصوتي';
+      } else if (selected === 'help_chan') {
+        title = '🔒 أوامر القنوات (Channels)';
+        desc = '`/lock` - قفل القناة\n`/unlock` - فتح القناة\n`/hide` - إخفاء القناة\n`/unhide` - إظهار القناة\n`/slowmode` - وضع البطء';
+      } else if (selected === 'help_util') {
+        title = '⚙️ الأوامر العامة والمعلومات (Utility)';
+        desc = '`/user` - عرض معلومات حسابك أو حساب آخر\n`/help` - عرض قائمة الأوامر المتاحة';
+      }
+
+      const categoryEmbed = new EmbedBuilder()
+        .setTitle(title)
+        .setDescription(desc)
+        .setColor('#2f3136');
+
+      await interaction.reply({ embeds: [categoryEmbed] });
+    }
+    // معالجة اختيار التذاكر
+    else if (interaction.customId === 'custom_ticket_select') {
       const ticketName = `ticket-${interaction.user.username}`;
       const existingChannel = interaction.guild.channels.cache.find(c => c.name === ticketName);
 
@@ -62,14 +87,8 @@ client.on('interactionCreate', async (interaction) => {
         name: ticketName,
         type: ChannelType.GuildText,
         permissionOverwrites: [
-          {
-            id: interaction.guild.roles.everyone.id,
-            deny: [PermissionFlagsBits.ViewChannel],
-          },
-          {
-            id: interaction.user.id,
-            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles],
-          },
+          { id: interaction.guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
+          { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles] },
         ],
       };
 
@@ -80,15 +99,14 @@ client.on('interactionCreate', async (interaction) => {
       const channel = await interaction.guild.channels.create(channelOptions);
 
       const ticketEmbed = new EmbedBuilder()
-        .setTitle(`🎟️ تذكرة جديدة / Support Ticket`)
-        .setDescription(`أهلاً بك <@${interaction.user.id}>!\nيرجى كتابة مشكلتك أو استفسارك هنا وسيقوم فريق الإدارة بالرد عليك قريباً.`)
-        .setColor('#5865F2')
-        .setFooter({ text: 'Oscorp Ticket System' });
+        .setTitle(`🎟️ تذكرة دعم جديدة`)
+        .setDescription(`أهلاً بك <@${interaction.user.id}>!\nيرجى طرح مشكلتك أو استفسارك هنا، وسيقوم فريق الدعم بمساعدتك قريبًا.`)
+        .setColor('#2f3136');
 
       const closeBtn = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId('close_ticket')
-          .setLabel('إغلاق التذكرة / Close')
+          .setLabel('إغلاق التذكرة')
           .setStyle(ButtonStyle.Danger)
           .setEmoji('🔒')
       );
