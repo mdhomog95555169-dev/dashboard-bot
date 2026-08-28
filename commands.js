@@ -51,12 +51,16 @@ module.exports = {
         const selectMenu = new ActionRowBuilder().addComponents(
           new StringSelectMenuBuilder()
             .setCustomId('custom_ticket_select')
-            .setPlaceholder('Choose Ticket Category / اختر نوع التذكرة...')
+            .setPlaceholder('اختر نوع التذكرة / Select Ticket Category...')
             .addOptions(options)
         );
 
         await interaction.channel.send({ embeds: [ticketEmbed], components: [selectMenu] });
-        await interaction.reply({ content: '✅ **Ticket Panel created successfully!**', ephemeral: true });
+        
+        const responseEmbed = new EmbedBuilder()
+          .setDescription('🎫 | تم إنشاء لوحة التذاكر بنجاح!')
+          .setColor('#57f287');
+        await interaction.reply({ embeds: [responseEmbed], ephemeral: true });
       }
     },
 
@@ -69,9 +73,9 @@ module.exports = {
         const helpEmbed = new EmbedBuilder()
           .setTitle('⚙️ Oscorp System Command Hub')
           .setDescription(
-            'Welcome to Oscorp System Dashboard.\n\n' +
-            '**System Status:** 🟢 All 21 Modules Active\n\n' +
-            'Select a command category below to view commands syntax and permissions.'
+            'أهلاً بك في قائمة أوامر النظام.\n\n' +
+            '**حالة النظام:** 🟢 جميع الـ 21 أمر شغال بنجاح\n\n' +
+            'اختر قسم الأوامر من القائمة المنسدلة لعرض تفاصيل الأوامر.'
           )
           .setColor('#2f3136')
           .setFooter({ text: 'Oscorp Security Systems' });
@@ -79,7 +83,7 @@ module.exports = {
         const helpMenu = new ActionRowBuilder().addComponents(
           new StringSelectMenuBuilder()
             .setCustomId('help_category_select')
-            .setPlaceholder('Select Command Category...')
+            .setPlaceholder('اختر قسم الأوامر...')
             .addOptions([
               { label: 'Moderation Suite', description: 'Ban, Kick, Timeout, Warn & Voice controls', value: 'help_mod', emoji: '🛡️' },
               { label: 'Channel Management', description: 'Lock, Unlock, Hide, Unhide & Slowmode', value: 'help_chan', emoji: '🔒' },
@@ -91,7 +95,7 @@ module.exports = {
       }
     },
 
-    // 🧹 3. Clear Command (Deleting messages... -> Embed result)
+    // 🧹 3. Clear Command
     {
       data: new SlashCommandBuilder().setName('clear').setDescription('🧹 Purge specified amount of messages')
         .addIntegerOption(opt => opt.setName('amount').setDescription('🔢 Number of messages (1-100)').setRequired(true))
@@ -99,23 +103,20 @@ module.exports = {
       async execute(interaction) {
         const amount = interaction.options.getInteger('amount');
         
-        // الرد الأولي كما في الصورة
         await interaction.reply({ content: 'Deleting messages ...' });
 
-        // حذف الرسائل
         const deleted = await interaction.channel.bulkDelete(amount, true).catch(() => null);
         const count = deleted ? deleted.size : amount;
 
         const clearEmbed = new EmbedBuilder()
-          .setDescription(`\`\`\`${count} messages have been deleted.\`\`\``)
+          .setDescription(`🧹 | ${count} messages have been deleted.`)
           .setColor('#2f3136');
 
-        // التعديل للإمبد التفاعلي المتناسق
         await interaction.editReply({ content: null, embeds: [clearEmbed] });
       }
     },
 
-    // 🔨 Ban Command
+    // 🔨 4. Ban Command
     {
       data: new SlashCommandBuilder().setName('ban').setDescription('🔨 Ban a user permanently')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
@@ -123,18 +124,17 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
       async execute(interaction) {
         const user = interaction.options.getUser('user');
-        const reason = interaction.options.getString('reason') || 'No reason provided';
+        const reason = interaction.options.getString('reason') || 'بدون سبب مذكور';
         await interaction.guild.members.ban(user, { reason }).catch(() => {});
         
         const embed = new EmbedBuilder()
-          .setTitle('🔨 Member Banned')
-          .setDescription(`User **${user.tag}** has been banned.\n**Reason:** ${reason}`)
+          .setDescription(`🔨 | تم حظر العضو ${user.tag} بنجاح! | السبب: ${reason}`)
           .setColor('#ed4245');
         await interaction.reply({ embeds: [embed] });
       }
     },
 
-    // 🔓 Unban Command
+    // 🔓 5. Unban Command
     {
       data: new SlashCommandBuilder().setName('unban').setDescription('🔓 Unban a user by ID')
         .addStringOption(opt => opt.setName('userid').setDescription('🆔 User ID').setRequired(true))
@@ -144,14 +144,13 @@ module.exports = {
         await interaction.guild.members.unban(userId).catch(() => {});
         
         const embed = new EmbedBuilder()
-          .setTitle('🔓 Member Unbanned')
-          .setDescription(`User ID \`${userId}\` has been unbanned.`)
+          .setDescription(`🔓 | تم إلغاء حظر المستخدم صاحب الآيدي \`${userId}\` بنجاح!`)
           .setColor('#57f287');
         await interaction.reply({ embeds: [embed] });
       }
     },
 
-    // 👢 Kick Command
+    // 👢 6. Kick Command
     {
       data: new SlashCommandBuilder().setName('kick').setDescription('👢 Kick a member from server')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
@@ -160,18 +159,17 @@ module.exports = {
       async execute(interaction) {
         const member = interaction.options.getMember('user');
         const user = interaction.options.getUser('user');
-        const reason = interaction.options.getString('reason') || 'No reason provided';
+        const reason = interaction.options.getString('reason') || 'بدون سبب مذكور';
         if (member) await member.kick(reason).catch(() => {});
 
         const embed = new EmbedBuilder()
-          .setTitle('👢 Member Kicked')
-          .setDescription(`User **${user.tag}** was kicked.\n**Reason:** ${reason}`)
+          .setDescription(`👢 | تم طرد العضو ${user.tag} من السيرفر! | السبب: ${reason}`)
           .setColor('#fee75c');
         await interaction.reply({ embeds: [embed] });
       }
     },
 
-    // 🔇 Timeout Command
+    // 🔇 7. Timeout Command
     {
       data: new SlashCommandBuilder().setName('timeout').setDescription('🔇 Timeout/Mute a member')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
@@ -181,18 +179,17 @@ module.exports = {
       async execute(interaction) {
         const member = interaction.options.getMember('user');
         const duration = interaction.options.getInteger('duration');
-        const reason = interaction.options.getString('reason') || 'No reason provided';
+        const reason = interaction.options.getString('reason') || 'بدون سبب مذكور';
         if (member) await member.timeout(duration * 60 * 1000, reason).catch(() => {});
 
         const embed = new EmbedBuilder()
-          .setTitle('🔇 Member Timed Out')
-          .setDescription(`**${member ? member.user.tag : 'User'}** has been muted for **${duration} minute(s)**.\n**Reason:** ${reason}`)
+          .setDescription(`🔇 | تم إعطاء ميوت مؤقت لـ ${member ? member.user.tag : 'العضو'} لمدة ${duration} دقيقة!`)
           .setColor('#ed4245');
         await interaction.reply({ embeds: [embed] });
       }
     },
 
-    // 🔊 Untimeout Command
+    // 🔊 8. Untimeout Command
     {
       data: new SlashCommandBuilder().setName('untimeout').setDescription('🔊 Remove timeout from a member')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
@@ -202,14 +199,13 @@ module.exports = {
         if (member) await member.timeout(null).catch(() => {});
 
         const embed = new EmbedBuilder()
-          .setTitle('🔊 Timeout Removed')
-          .setDescription(`Timeout removed for **${member ? member.user.tag : 'User'}**.`)
+          .setDescription(`🔊 | تم فك الميوت عن العضو ${member ? member.user.tag : 'العضو'} بنجاح!`)
           .setColor('#57f287');
         await interaction.reply({ embeds: [embed] });
       }
     },
 
-    // ⚠️ Warn Command
+    // ⚠️ 9. Warn Command
     {
       data: new SlashCommandBuilder().setName('warn').setDescription('⚠️ Issue warning to a member')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
@@ -220,14 +216,13 @@ module.exports = {
         const reason = interaction.options.getString('reason');
 
         const embed = new EmbedBuilder()
-          .setTitle('⚠️ Member Warned')
-          .setDescription(`Warning issued to **${user.tag}**.\n**Reason:** ${reason}`)
+          .setDescription(`⚠️ | تم تحذير العضو ${user.tag} بنجاح! | السبب: ${reason}`)
           .setColor('#fee75c');
         await interaction.reply({ embeds: [embed] });
       }
     },
 
-    // 🔒 Lock Command
+    // 🔒 10. Lock Command
     {
       data: new SlashCommandBuilder().setName('lock').setDescription('🔒 Lock text channel')
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
@@ -235,14 +230,13 @@ module.exports = {
         await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { SendMessages: false }).catch(() => {});
 
         const embed = new EmbedBuilder()
-          .setTitle('🔒 Channel Locked')
-          .setDescription(`Channel <#${interaction.channel.id}> is now locked.`)
+          .setDescription(`🔒 | تم قفل الروم الكتابي بنجاح!`)
           .setColor('#ed4245');
         await interaction.reply({ embeds: [embed] });
       }
     },
 
-    // 🔓 Unlock Command
+    // 🔓 11. Unlock Command
     {
       data: new SlashCommandBuilder().setName('unlock').setDescription('🔓 Unlock text channel')
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
@@ -250,14 +244,13 @@ module.exports = {
         await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { SendMessages: true }).catch(() => {});
 
         const embed = new EmbedBuilder()
-          .setTitle('🔓 Channel Unlocked')
-          .setDescription(`Channel <#${interaction.channel.id}> is now unlocked.`)
+          .setDescription(`🔓 | تم فتح الروم الكتابي بنجاح!`)
           .setColor('#57f287');
         await interaction.reply({ embeds: [embed] });
       }
     },
 
-    // 👁️‍🗨️ Hide Command
+    // 👁️‍🗨️ 12. Hide Command
     {
       data: new SlashCommandBuilder().setName('hide').setDescription('👁️‍🗨️ Hide channel from members')
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
@@ -265,14 +258,13 @@ module.exports = {
         await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { ViewChannel: false }).catch(() => {});
 
         const embed = new EmbedBuilder()
-          .setTitle('👁️‍🗨️ Channel Hidden')
-          .setDescription(`This channel is now hidden.`)
+          .setDescription(`👁️‍🗨️ | تم إخفاء الروم عن باقي الأعضاء بنجاح!`)
           .setColor('#2f3136');
         await interaction.reply({ embeds: [embed] });
       }
     },
 
-    // 👁️ Unhide Command
+    // 👁️ 13. Unhide Command
     {
       data: new SlashCommandBuilder().setName('unhide').setDescription('👁️ Make channel visible')
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
@@ -280,14 +272,13 @@ module.exports = {
         await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { ViewChannel: true }).catch(() => {});
 
         const embed = new EmbedBuilder()
-          .setTitle('👁️ Channel Visible')
-          .setDescription(`This channel is now visible to members.`)
+          .setDescription(`👁️ | تم إظهار الروم للأعضاء بنجاح!`)
           .setColor('#57f287');
         await interaction.reply({ embeds: [embed] });
       }
     },
 
-    // ⏳ Slowmode Command
+    // ⏳ 14. Slowmode Command
     {
       data: new SlashCommandBuilder().setName('slowmode').setDescription('⏳ Set channel slowmode seconds')
         .addIntegerOption(opt => opt.setName('seconds').setDescription('⏱️ Seconds').setRequired(true))
@@ -297,14 +288,13 @@ module.exports = {
         await interaction.channel.setRateLimitPerUser(seconds).catch(() => {});
 
         const embed = new EmbedBuilder()
-          .setTitle('⏳ Slowmode Updated')
-          .setDescription(`Channel slowmode set to **${seconds} seconds**.`)
+          .setDescription(`⏳ | تم ضبط الوضع البطئ للروم إلى ${seconds} ثانية!`)
           .setColor('#5865f2');
         await interaction.reply({ embeds: [embed] });
       }
     },
 
-    // 🎙️ VKick Command
+    // 🎙️ 15. VKick Command
     {
       data: new SlashCommandBuilder().setName('vkick').setDescription('🎙️ Kick user from voice channel')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
@@ -314,17 +304,16 @@ module.exports = {
         if (member && member.voice.channel) {
           await member.voice.setChannel(null).catch(() => {});
           const embed = new EmbedBuilder()
-            .setTitle('🎙️ Voice Kick')
-            .setDescription(`Disconnected **${member.user.tag}** from voice.`)
+            .setDescription(`🎙️ | تم طرد العضو ${member.user.tag} من الروم الصوتي!`)
             .setColor('#ed4245');
           await interaction.reply({ embeds: [embed] });
         } else {
-          await interaction.reply({ content: '❌ Member is not connected to any voice channel.', ephemeral: true });
+          await interaction.reply({ content: '❌ العضو غير متواجد في روم صوتي.', ephemeral: true });
         }
       }
     },
 
-    // ↗️ VMove Command
+    // ↗️ 16. VMove Command
     {
       data: new SlashCommandBuilder().setName('vmove').setDescription('↗️ Move member to voice channel')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
@@ -336,17 +325,16 @@ module.exports = {
         if (member && member.voice.channel) {
           await member.voice.setChannel(channel).catch(() => {});
           const embed = new EmbedBuilder()
-            .setTitle('↗️ Voice Move')
-            .setDescription(`Moved **${member.user.tag}** to <#${channel.id}>.`)
+            .setDescription(`↗️ | تم نقل العضو ${member.user.tag} إلى الروم الصوتي ${channel.name}!`)
             .setColor('#5865f2');
           await interaction.reply({ embeds: [embed] });
         } else {
-          await interaction.reply({ content: '❌ Member is not in a voice channel.', ephemeral: true });
+          await interaction.reply({ content: '❌ العضو غير متواجد في روم صوتي.', ephemeral: true });
         }
       }
     },
 
-    // 🎙️ VMute Command
+    // 🎙️ 17. VMute Command
     {
       data: new SlashCommandBuilder().setName('vmute').setDescription('🎙️ Mute member in voice')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
@@ -356,17 +344,16 @@ module.exports = {
         if (member && member.voice.channel) {
           await member.voice.setMute(true).catch(() => {});
           const embed = new EmbedBuilder()
-            .setTitle('🎙️ Voice Mute')
-            .setDescription(`Muted **${member.user.tag}** in voice.`)
+            .setDescription(`🎙️ | تم كتم ميوت العضو ${member.user.tag} داخل الروم الصوتي!`)
             .setColor('#ed4245');
           await interaction.reply({ embeds: [embed] });
         } else {
-          await interaction.reply({ content: '❌ Member is not in a voice channel.', ephemeral: true });
+          await interaction.reply({ content: '❌ العضو غير متواجد في روم صوتي.', ephemeral: true });
         }
       }
     },
 
-    // 🔊 VUnmute Command
+    // 🔊 18. VUnmute Command
     {
       data: new SlashCommandBuilder().setName('vunmute').setDescription('🔊 Unmute member in voice')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
@@ -376,17 +363,16 @@ module.exports = {
         if (member && member.voice.channel) {
           await member.voice.setMute(false).catch(() => {});
           const embed = new EmbedBuilder()
-            .setTitle('🔊 Voice Unmute')
-            .setDescription(`Unmuted **${member.user.tag}** in voice.`)
+            .setDescription(`🔊 | تم فك الميوت الصوتي عن العضو ${member.user.tag}!`)
             .setColor('#57f287');
           await interaction.reply({ embeds: [embed] });
         } else {
-          await interaction.reply({ content: '❌ Member is not in a voice channel.', ephemeral: true });
+          await interaction.reply({ content: '❌ العضو غير متواجد في روم صوتي.', ephemeral: true });
         }
       }
     },
 
-    // 🎧 VDeaf Command
+    // 🎧 19. VDeaf Command
     {
       data: new SlashCommandBuilder().setName('vdeaf').setDescription('🎧 Deafen member in voice')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
@@ -396,17 +382,16 @@ module.exports = {
         if (member && member.voice.channel) {
           await member.voice.setDeaf(true).catch(() => {});
           const embed = new EmbedBuilder()
-            .setTitle('🎧 Voice Deafen')
-            .setDescription(`Deafened **${member.user.tag}** in voice.`)
+            .setDescription(`🎧 | تم إعطاء وايب آوت (صمم صوتي) للعضو ${member.user.tag}!`)
             .setColor('#ed4245');
           await interaction.reply({ embeds: [embed] });
         } else {
-          await interaction.reply({ content: '❌ Member is not in a voice channel.', ephemeral: true });
+          await interaction.reply({ content: '❌ العضو غير متواجد في روم صوتي.', ephemeral: true });
         }
       }
     },
 
-    // 🎧 VUndeaf Command
+    // 🎧 20. VUndeaf Command
     {
       data: new SlashCommandBuilder().setName('vundeaf').setDescription('🎧 Undeafen member in voice')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
@@ -416,17 +401,16 @@ module.exports = {
         if (member && member.voice.channel) {
           await member.voice.setDeaf(false).catch(() => {});
           const embed = new EmbedBuilder()
-            .setTitle('🎧 Voice Undeafen')
-            .setDescription(`Undeafened **${member.user.tag}** in voice.`)
+            .setDescription(`🎧 | تم إلغاء الصمم الصوتي عن العضو ${member.user.tag}!`)
             .setColor('#57f287');
           await interaction.reply({ embeds: [embed] });
         } else {
-          await interaction.reply({ content: '❌ Member is not in a voice channel.', ephemeral: true });
+          await interaction.reply({ content: '❌ العضو غير متواجد في روم صوتي.', ephemeral: true });
         }
       }
     },
 
-    // ➕ Role Add Command
+    // ➕ 21. Role Add Command
     {
       data: new SlashCommandBuilder().setName('role-add').setDescription('➕ Add role to member')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
@@ -438,14 +422,13 @@ module.exports = {
         if (member) await member.roles.add(role).catch(() => {});
 
         const embed = new EmbedBuilder()
-          .setTitle('➕ Role Added')
-          .setDescription(`Role **${role.name}** added to **${member ? member.user.tag : 'User'}**.`)
+          .setDescription(`➕ | تم إضافة الرتبة \`${role.name}\` للعضو ${member ? member.user.tag : 'العضو'} بنجاح!`)
           .setColor('#57f287');
         await interaction.reply({ embeds: [embed] });
       }
     },
 
-    // ➖ Role Remove Command
+    // ➖ 22. Role Remove Command
     {
       data: new SlashCommandBuilder().setName('role-remove').setDescription('➖ Remove role from member')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User').setRequired(true))
@@ -457,14 +440,13 @@ module.exports = {
         if (member) await member.roles.remove(role).catch(() => {});
 
         const embed = new EmbedBuilder()
-          .setTitle('➖ Role Removed')
-          .setDescription(`Role **${role.name}** removed from **${member ? member.user.tag : 'User'}**.`)
+          .setDescription(`➖ | تم إزالة الرتبة \`${role.name}\` من العضو ${member ? member.user.tag : 'العضو'} بنجاح!`)
           .setColor('#ed4245');
         await interaction.reply({ embeds: [embed] });
       }
     },
 
-    // 👤 User Info Command
+    // 👤 23. User Info Command
     {
       data: new SlashCommandBuilder().setName('user').setDescription('👤 View member profile & ID')
         .addUserOption(opt => opt.setName('user').setDescription('👤 Target User')),
@@ -472,11 +454,11 @@ module.exports = {
         const user = interaction.options.getUser('user') || interaction.user;
 
         const embed = new EmbedBuilder()
-          .setTitle('👤 User Profile')
+          .setTitle('👤 معلومات العضو / User Profile')
           .setThumbnail(user.displayAvatarURL())
           .addFields(
-            { name: 'User Tag', value: `${user.tag}`, inline: true },
-            { name: 'User ID', value: `\`${user.id}\``, inline: true }
+            { name: 'اسم العضو', value: `${user.tag}`, inline: true },
+            { name: 'الآيدي (ID)', value: `\`${user.id}\``, inline: true }
           )
           .setColor('#2f3136');
         await interaction.reply({ embeds: [embed] });
