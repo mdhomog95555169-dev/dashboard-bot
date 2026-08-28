@@ -1,8 +1,9 @@
 const { PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
 const { getWarnings, addWarning, removeWarning, getPoints, addPoints } = require('./database');
 
-function ok(description) { return { embeds: [new EmbedBuilder().setColor(0x2ecc71).setDescription(description)] }; }
-function fail(description) { return { embeds: [new EmbedBuilder().setColor(0xe74c3c).setDescription(description)] }; }
+// ProBot-style plain text replies — no embeds in direct commands.
+function ok(text) { return { content: text }; }
+function fail(text) { return { content: text }; }
 
 function resolveChannelMention(guild, raw) {
   const id = raw.replace(/[<#>]/g, '');
@@ -41,7 +42,7 @@ function parseDuration(input) {
   return value * mult;
 }
 
-// جدولة حظر مؤقت في الذاكرة فقط - لا تنجو من إعادة تشغيل البوت (redeploy)
+// جدول حظر مؤقت في الذاكرة فقط - لا تنجو من إعادة تشغيل البوت (redeploy)
 const tempBanTimers = new Map();
 function scheduleTempUnban(guild, userId, ms) {
   const key = `${guild.id}-${userId}`;
@@ -62,9 +63,67 @@ function attachHelpCollector(message, ctx, buildEmbed) {
   collector.on('end', async () => { try { await message.edit({ components: [] }); } catch {} });
 }
 
+// ---------------- /help content (exact spec) ----------------
+const HELP_CATEGORIES = {
+  moderation: {
+    label: 'Moderation',
+    emoji: '🛡️',
+    description:
+      '**Welcome to OS Control Center.**\n**Select a category from the menu below.**\n\n' +
+      '✈️ `/ban`\nBan a member from the server\n\n' +
+      '🔓 `/unban`\nUnban a member by ID\n\n' +
+      '👢 `/kick`\nKick a member from the server\n\n' +
+      '🔊 `/vkick`\nKick a member from voice channel\n\n' +
+      '⏱️ `/timeout`\nTimeout a member\n\n' +
+      '🔄 `/untimeout`\nRemove timeout from a member\n\n' +
+      '🔇 `/mutetext`\nMute text for a member\n\n' +
+      '🔊 `/unmutetext`\nUnmute text for a member\n\n' +
+      '🔇 `/mutevoice`\nMute voice for a member\n\n' +
+      '🔊 `/unmutevoice`\nUnmute voice for a member\n\n' +
+      '⚠️ `/warn`\nWarn a member\n\n' +
+      '🗑️ `/warn_remove`\nRemove a warning from a member\n\n' +
+      '📋 `/warnings`\nView warnings of a member\n\n' +
+      '🧹 `/clear`\nClear a specified number of messages',
+  },
+  channels: {
+    label: 'Channels & Roles',
+    emoji: '📂',
+    description:
+      '**Welcome to OS Control Center.**\n**Select a category from the menu below.**\n\n' +
+      '🔒 `/lock`\nLock the current channel\n\n' +
+      '🔓 `/unlock`\nUnlock the current channel\n\n' +
+      '🎭 `/role`\nAdd or remove a role\n\n' +
+      '🎨 `/setcolor`\nChange a role color\n\n' +
+      '🐢 `/slowmode`\nSet channel slowmode\n\n' +
+      '🏷️ `/setnick`\nChange a user\'s nickname\n\n' +
+      '📊 `/points`\nUser points system',
+  },
+  utility: {
+    label: 'Utility',
+    emoji: '🧰',
+    description:
+      '**Welcome to OS Control Center.**\n**Select a category from the menu below.**\n\n' +
+      '📢 `/embed`\nSend a custom embed\n\n' +
+      '💬 `/say`\nMake the bot say a message\n\n' +
+      '🤖 `/botinfo`\nBot information & stats\n\n' +
+      '⚙️ `/help`\nDisplay the help menu',
+  },
+};
+
+function buildHelpEmbed(key, botAvatarUrl) {
+  const cat = HELP_CATEGORIES[key];
+  const embed = new EmbedBuilder()
+    .setTitle('⚡ OS System — Control Center')
+    .setDescription(cat.description)
+    .setColor(0x5865f2)
+    .setFooter({ text: 'OS System Engine' });
+  if (botAvatarUrl) embed.setThumbnail(botAvatarUrl);
+  return embed;
+}
+
 const commands = [
   {
-    name: 'ban', description: 'Ban a member from the server | حظر عضو من السيرفر', permission: PermissionFlagsBits.BanMembers,
+    name: 'ban', description: 'Ban a member from the server', permission: PermissionFlagsBits.BanMembers,
     options: [
       { name: 'user', type: 'user', required: true, description: 'The member to ban' },
       { name: 'reason', type: 'string', required: false, consumeRest: true, description: 'Reason for the ban' },
@@ -89,7 +148,7 @@ const commands = [
     },
   },
   {
-    name: 'unban', description: 'Unban a user by ID | فك حظر عضو عبر الآيدي', permission: PermissionFlagsBits.BanMembers,
+    name: 'unban', description: 'Unban a user by ID', permission: PermissionFlagsBits.BanMembers,
     options: [{ name: 'user_id', type: 'string', required: true, description: 'The ID of the user to unban' }],
     execute: async (ctx) => {
       const id = ctx.getString('user_id');
@@ -101,7 +160,7 @@ const commands = [
     },
   },
   {
-    name: 'kick', description: 'Kick a member from the server | طرد عضو من السيرفر', permission: PermissionFlagsBits.KickMembers,
+    name: 'kick', description: 'Kick a member from the server', permission: PermissionFlagsBits.KickMembers,
     options: [
       { name: 'user', type: 'user', required: true, description: 'The member to kick' },
       { name: 'reason', type: 'string', required: false, consumeRest: true, description: 'Reason for the kick' },
@@ -116,7 +175,7 @@ const commands = [
     },
   },
   {
-    name: 'vkick', description: 'Disconnect a member from their voice channel | طرد عضو من الروم الصوتي', permission: PermissionFlagsBits.MoveMembers,
+    name: 'vkick', description: 'Disconnect a member from their voice channel', permission: PermissionFlagsBits.MoveMembers,
     options: [
       { name: 'user', type: 'user', required: true, description: 'The member to disconnect' },
       { name: 'reason', type: 'string', required: false, consumeRest: true, description: 'Reason' },
@@ -130,7 +189,7 @@ const commands = [
     },
   },
   {
-    name: 'timeout', description: 'Timeout a member | إسكات مؤقت لعضو', permission: PermissionFlagsBits.ModerateMembers,
+    name: 'timeout', description: 'Timeout a member', permission: PermissionFlagsBits.ModerateMembers,
     options: [
       { name: 'user', type: 'user', required: true, description: 'The member to timeout' },
       { name: 'duration', type: 'string', required: true, description: 'Duration, e.g. 10m, 2h, 1d' },
@@ -148,7 +207,7 @@ const commands = [
     },
   },
   {
-    name: 'untimeout', description: 'Remove a timeout from a member | إلغاء الإسكات المؤقت', permission: PermissionFlagsBits.ModerateMembers,
+    name: 'untimeout', description: 'Remove a timeout from a member', permission: PermissionFlagsBits.ModerateMembers,
     options: [{ name: 'user', type: 'user', required: true, description: 'The member' }],
     execute: async (ctx) => {
       const member = await ctx.getUserMember('user');
@@ -158,7 +217,7 @@ const commands = [
     },
   },
   {
-    name: 'mutetext', description: 'Mute a member from all text channels | كتم عضو عن الكتابة', permission: PermissionFlagsBits.ModerateMembers,
+    name: 'mutetext', description: 'Mute a member from all text channels', permission: PermissionFlagsBits.ModerateMembers,
     options: [
       { name: 'user', type: 'user', required: true, description: 'The member' },
       { name: 'reason', type: 'string', required: false, consumeRest: true, description: 'Reason' },
@@ -173,7 +232,7 @@ const commands = [
     },
   },
   {
-    name: 'unmutetext', description: 'Unmute a member from text channels | إلغاء كتم الكتابة', permission: PermissionFlagsBits.ModerateMembers,
+    name: 'unmutetext', description: 'Unmute a member from text channels', permission: PermissionFlagsBits.ModerateMembers,
     options: [{ name: 'user', type: 'user', required: true, description: 'The member' }],
     execute: async (ctx) => {
       const member = await ctx.getUserMember('user');
@@ -184,7 +243,7 @@ const commands = [
     },
   },
   {
-    name: 'mutevoice', description: 'Server-mute a member in voice | كتم صوت عضو', permission: PermissionFlagsBits.MuteMembers,
+    name: 'mutevoice', description: 'Server-mute a member in voice', permission: PermissionFlagsBits.MuteMembers,
     options: [
       { name: 'user', type: 'user', required: true, description: 'The member' },
       { name: 'reason', type: 'string', required: false, consumeRest: true, description: 'Reason' },
@@ -198,7 +257,7 @@ const commands = [
     },
   },
   {
-    name: 'unmutevoice', description: 'Remove voice mute from a member | إلغاء كتم صوت عضو', permission: PermissionFlagsBits.MuteMembers,
+    name: 'unmutevoice', description: 'Remove voice mute from a member', permission: PermissionFlagsBits.MuteMembers,
     options: [{ name: 'user', type: 'user', required: true, description: 'The member' }],
     execute: async (ctx) => {
       const member = await ctx.getUserMember('user');
@@ -208,7 +267,7 @@ const commands = [
     },
   },
   {
-    name: 'warn', description: 'Warn a member | إضافة تحذير لعضو', permission: PermissionFlagsBits.ModerateMembers,
+    name: 'warn', description: 'Warn a member', permission: PermissionFlagsBits.ModerateMembers,
     options: [
       { name: 'user', type: 'user', required: true, description: 'The member' },
       { name: 'reason', type: 'string', required: true, consumeRest: true, description: 'Reason for the warning' },
@@ -218,12 +277,12 @@ const commands = [
       const reason = ctx.getString('reason');
       if (!member) return ctx.reply(fail('❌ Member not found.'));
       if (!reason) return ctx.reply(fail('❌ You must provide a reason.'));
-      const warning = addWarning(ctx.guild.id, member.id, reason, ctx.invoker.id);
+      const warning = await addWarning(ctx.guild.id, member.id, reason, ctx.invoker.id);
       return ctx.reply(ok(`⚠️ **${member.user.tag}** has been warned!\n📝 Reason: ${reason}\n🆔 Warn ID: \`${warning.id}\``));
     },
   },
   {
-    name: 'warn_remove', description: 'Remove a specific warning | حذف تحذير معين', permission: PermissionFlagsBits.ModerateMembers,
+    name: 'warn_remove', description: 'Remove a specific warning', permission: PermissionFlagsBits.ModerateMembers,
     options: [
       { name: 'user', type: 'user', required: true, description: 'The member' },
       { name: 'warn_id', type: 'string', required: true, description: 'The warning ID' },
@@ -232,26 +291,26 @@ const commands = [
       const member = await ctx.getUserMember('user');
       const warnId = ctx.getString('warn_id');
       if (!member) return ctx.reply(fail('❌ Member not found.'));
-      const removed = removeWarning(ctx.guild.id, member.id, warnId);
+      const removed = await removeWarning(ctx.guild.id, member.id, warnId);
       if (!removed) return ctx.reply(fail('❌ No warning found with this ID.'));
       return ctx.reply(ok(`✅ Warning \`${warnId}\` has been removed from **${member.user.tag}**!`));
     },
   },
   {
-    name: 'warnings', description: 'View a member\'s warning history | عرض تحذيرات عضو', permission: PermissionFlagsBits.ModerateMembers,
+    name: 'warnings', description: 'View a member\'s warning history', permission: PermissionFlagsBits.ModerateMembers,
     options: [{ name: 'user', type: 'user', required: true, description: 'The member' }],
     execute: async (ctx) => {
       const member = await ctx.getUserMember('user');
       if (!member) return ctx.reply(fail('❌ Member not found.'));
-      const warns = getWarnings(ctx.guild.id, member.id);
+      const warns = await getWarnings(ctx.guild.id, member.id);
       if (!warns.length) return ctx.reply(ok(`✅ **${member.user.tag}** has no warnings.`));
-      const list = warns.map((w, i) => `**${i + 1}.** \`${w.id}\` - ${w.reason} (by <@${w.moderator_id}>)`).join('\n');
-      return ctx.reply({ embeds: [new EmbedBuilder().setColor(0xf1c40f).setTitle(`⚠️ Warnings — ${member.user.tag}`).setDescription(list)] });
+      const list = warns.map((w, i) => `**${i + 1}.** \`${w.id}\` - ${w.reason} (by <@${w.moderatorId}>)`).join('\n');
+      return ctx.reply(ok(`⚠️ Warnings — ${member.user.tag}\n${list}`));
     },
   },
   {
-    name: 'clear', description: 'Bulk delete messages (1-100) | حذف عدد من الرسائل', permission: PermissionFlagsBits.ManageMessages,
-    options: [{ name: 'amount', type: 'integer', required: true, description: 'Number of messages to delete (1-100) | عدد الرسائل' }],
+    name: 'clear', description: 'Bulk delete messages (1-100)', permission: PermissionFlagsBits.ManageMessages,
+    options: [{ name: 'amount', type: 'integer', required: true, description: 'Number of messages to delete (1-100)' }],
     execute: async (ctx) => {
       let amount = ctx.getInteger('amount');
       if (!amount || amount < 1) return ctx.reply(fail('❌ Enter a number between 1 and 100.'));
@@ -262,7 +321,7 @@ const commands = [
     },
   },
   {
-    name: 'setnick', description: 'Change a member\'s nickname | تغيير اسم عضو', permission: PermissionFlagsBits.ManageNicknames,
+    name: 'setnick', description: 'Change a member\'s nickname', permission: PermissionFlagsBits.ManageNicknames,
     options: [
       { name: 'user', type: 'user', required: true, description: 'The member' },
       { name: 'nickname', type: 'string', required: true, consumeRest: true, description: 'New nickname' },
@@ -278,7 +337,7 @@ const commands = [
     },
   },
   {
-    name: 'points', description: 'Manage member points | نظام نقاط الأعضاء', permission: PermissionFlagsBits.ManageGuild,
+    name: 'points', description: 'Manage member points', permission: PermissionFlagsBits.ManageGuild,
     options: [
       { name: 'action', type: 'string', required: true, description: 'add / remove / show' },
       { name: 'user', type: 'user', required: true, description: 'The member' },
@@ -289,14 +348,23 @@ const commands = [
       const member = await ctx.getUserMember('user');
       const amount = ctx.getInteger('amount') || 0;
       if (!member) return ctx.reply(fail('❌ Member not found.'));
-      if (action === 'add') return ctx.reply(ok(`✅ Added **${Math.abs(amount)}** points to **${member.user.tag}**! Balance: ${addPoints(ctx.guild.id, member.id, Math.abs(amount))}`));
-      if (action === 'remove') return ctx.reply(ok(`✅ Removed **${Math.abs(amount)}** points from **${member.user.tag}**! Balance: ${addPoints(ctx.guild.id, member.id, -Math.abs(amount))}`));
-      if (action === 'show') return ctx.reply(ok(`📊 **${member.user.tag}**'s balance: **${getPoints(ctx.guild.id, member.id)}** points.`));
+      if (action === 'add') {
+        const balance = await addPoints(ctx.guild.id, member.id, Math.abs(amount));
+        return ctx.reply(ok(`✅ Added **${Math.abs(amount)}** points to **${member.user.tag}**! Balance: ${balance}`));
+      }
+      if (action === 'remove') {
+        const balance = await addPoints(ctx.guild.id, member.id, -Math.abs(amount));
+        return ctx.reply(ok(`✅ Removed **${Math.abs(amount)}** points from **${member.user.tag}**! Balance: ${balance}`));
+      }
+      if (action === 'show') {
+        const balance = await getPoints(ctx.guild.id, member.id);
+        return ctx.reply(ok(`📊 **${member.user.tag}**'s balance: **${balance}** points.`));
+      }
       return ctx.reply(fail('❌ Invalid action, use: add / remove / show'));
     },
   },
   {
-    name: 'lock', description: 'Lock a channel | قفل الروم', permission: PermissionFlagsBits.ManageChannels,
+    name: 'lock', description: 'Lock a channel', permission: PermissionFlagsBits.ManageChannels,
     options: [{ name: 'channel', type: 'channel', required: false, description: 'The channel (optional)' }],
     execute: async (ctx) => {
       const channel = ctx.getChannel('channel') || ctx.channel;
@@ -305,7 +373,7 @@ const commands = [
     },
   },
   {
-    name: 'unlock', description: 'Unlock a channel | فتح الروم', permission: PermissionFlagsBits.ManageChannels,
+    name: 'unlock', description: 'Unlock a channel', permission: PermissionFlagsBits.ManageChannels,
     options: [{ name: 'channel', type: 'channel', required: false, description: 'The channel (optional)' }],
     execute: async (ctx) => {
       const channel = ctx.getChannel('channel') || ctx.channel;
@@ -314,7 +382,7 @@ const commands = [
     },
   },
   {
-    name: 'role', description: 'Add or remove a role from a member | إضافة أو إزالة رتبة', permission: PermissionFlagsBits.ManageRoles,
+    name: 'role', description: 'Add or remove a role from a member', permission: PermissionFlagsBits.ManageRoles,
     options: [
       { name: 'user', type: 'user', required: true, description: 'The member' },
       { name: 'role', type: 'role', required: true, description: 'The role' },
@@ -333,7 +401,7 @@ const commands = [
     },
   },
   {
-    name: 'setcolor', description: 'Change a role\'s color | تغيير لون رتبة', permission: PermissionFlagsBits.ManageRoles,
+    name: 'setcolor', description: 'Change a role\'s color', permission: PermissionFlagsBits.ManageRoles,
     options: [
       { name: 'role', type: 'role', required: true, description: 'The role' },
       { name: 'color', type: 'string', required: true, description: 'HEX color, e.g. #ff0000' },
@@ -348,7 +416,7 @@ const commands = [
     },
   },
   {
-    name: 'slowmode', description: 'Set slowmode for a channel | ضبط الوضع البطيء', permission: PermissionFlagsBits.ManageChannels,
+    name: 'slowmode', description: 'Set slowmode for a channel', permission: PermissionFlagsBits.ManageChannels,
     options: [
       { name: 'seconds', type: 'integer', required: true, description: 'Seconds (0 to disable)' },
       { name: 'channel', type: 'channel', required: false, description: 'The channel (optional)' },
@@ -362,7 +430,7 @@ const commands = [
     },
   },
   {
-    name: 'embed', description: 'Send a custom embed message | إرسال رسالة Embed', permission: PermissionFlagsBits.ManageMessages,
+    name: 'embed', description: 'Send a custom embed message', permission: PermissionFlagsBits.ManageMessages,
     options: [
       { name: 'title', type: 'string', required: true, description: 'Embed title' },
       { name: 'description', type: 'string', required: true, consumeRest: true, description: 'Embed description (use | in prefix mode to separate title/description)' },
@@ -393,7 +461,7 @@ const commands = [
     },
   },
   {
-    name: 'say', description: 'Make the bot send a message | إرسال رسالة بواسطة البوت', permission: PermissionFlagsBits.ManageMessages,
+    name: 'say', description: 'Make the bot send a message', permission: PermissionFlagsBits.ManageMessages,
     options: [
       { name: 'message', type: 'string', required: true, consumeRest: true, description: 'The message content' },
       { name: 'channel', type: 'channel', required: false, description: 'The channel (optional)' },
@@ -415,31 +483,24 @@ const commands = [
     },
   },
   {
-    name: 'botinfo', description: 'View bot info and status | عرض معلومات البوت', options: [],
+    name: 'botinfo', description: 'View bot info and status', options: [],
     execute: async (ctx) => {
       const client = ctx.raw.client;
-      const embed = new EmbedBuilder()
-        .setTitle('🤖 OS System Engine — Bot Info')
-        .setColor(0x5865f2)
-        .addFields(
-          { name: 'Servers', value: `${client.guilds.cache.size}`, inline: true },
-          { name: 'Users', value: `${client.guilds.cache.reduce((a, g) => a + g.memberCount, 0)}`, inline: true },
-          { name: 'Ping', value: `${client.ws.ping}ms`, inline: true },
-          { name: 'Uptime', value: formatUptime(client.uptime), inline: true },
-        )
-        .setTimestamp();
-      return ctx.reply({ embeds: [embed] });
+      const lines = [
+        '🤖 OS System Engine — Bot Info',
+        `Servers: ${client.guilds.cache.size}`,
+        `Users: ${client.guilds.cache.reduce((a, g) => a + g.memberCount, 0)}`,
+        `Ping: ${client.ws.ping}ms`,
+        `Uptime: ${formatUptime(client.uptime)}`,
+      ];
+      return ctx.reply(ok(lines.join('\n')));
     },
   },
   {
-    name: 'help', description: 'View the interactive help menu | قائمة المساعدة', options: [],
+    name: 'help', description: 'View the interactive help menu', options: [],
     execute: async (ctx) => {
-      const categories = {
-        moderation: { label: '🛡️ Moderation', desc: '`ban` `unban` `kick` `vkick` `timeout` `untimeout` `mutetext` `unmutetext` `mutevoice` `unmutevoice` `warn` `warn_remove` `warnings` `clear`' },
-        channels: { label: '📂 Channels & Roles', desc: '`lock` `unlock` `role` `setcolor` `slowmode` `setnick` `points`' },
-        utility: { label: '🧰 Utility', desc: '`embed` `say` `botinfo` `help`' },
-      };
-      const buildEmbed = (key) => new EmbedBuilder().setTitle(`📖 Command List — ${categories[key].label}`).setDescription(categories[key].desc).setColor(0x5865f2);
+      const client = ctx.raw.client;
+      const botAvatarUrl = client.user.displayAvatarURL();
       const row = new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder().setCustomId('help_menu').setPlaceholder('Choose a category').addOptions(
           { label: 'Moderation', value: 'moderation', emoji: '🛡️' },
@@ -447,6 +508,7 @@ const commands = [
           { label: 'Utility', value: 'utility', emoji: '🧰' },
         )
       );
+      const buildEmbed = (key) => buildHelpEmbed(key, botAvatarUrl);
       if (ctx.isSlash) {
         await ctx.raw.reply({ embeds: [buildEmbed('moderation')], components: [row] });
         const message = await ctx.raw.fetchReply();
@@ -459,4 +521,4 @@ const commands = [
   },
 ];
 
-module.exports = { commands };
+module.exports = { commands, buildHelpEmbed, HELP_CATEGORIES };

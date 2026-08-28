@@ -1,7 +1,7 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Partials, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, Collection, EmbedBuilder } = require('discord.js');
 const { commands } = require('./commands');
-const { getPrefix } = require('./database');
+const { getPrefix, resolveAlias } = require('./database');
 const { handleMessage: handleAutomod } = require('./automod');
 const { createApp } = require('./dashboard');
 const { deployCommands } = require('./deploy-commands');
@@ -148,15 +148,34 @@ client.on('interactionCreate', async (interaction) => {
 client.on('messageCreate', async (message) => {
   if (message.author.bot || !message.guild) return;
 
+  // Mention response — replying with a plain @mention (no other command text) shows the help embed.
+  if (message.mentions.has(client.user) && !message.mentions.everyone) {
+    const mentionRegex = new RegExp(`^<@!?${client.user.id}>$`);
+    if (mentionRegex.test(message.content.trim())) {
+      const embed = new EmbedBuilder()
+        .setTitle('⚡ Need help?')
+        .setDescription('Use `-help` or `/help` to see all available options.')
+        .setColor(0x5865f2)
+        .setFooter({ text: 'OS System Engine' });
+      await message.reply({ embeds: [embed] });
+      return;
+    }
+  }
+
   const handled = await handleAutomod(message).catch((err) => { console.error('AutoMod error:', err); return false; });
   if (handled) return;
 
-  const prefix = getPrefix(message.guild.id);
+  const prefix = await getPrefix(message.guild.id);
   if (!message.content.startsWith(prefix)) return;
 
   const args = message.content.slice(prefix.length).trim().split(/\s+/);
   const cmdName = args.shift().toLowerCase();
-  const command = client.commands.get(cmdName);
+  let command = client.commands.get(cmdName);
+
+  if (!command) {
+    const aliasTarget = await resolveAlias(message.guild.id, cmdName).catch(() => null);
+    if (aliasTarget) command = client.commands.get(aliasTarget);
+  }
   if (!command) return;
 
   if (command.permission && !checkPermission(message.member, command.permission)) {

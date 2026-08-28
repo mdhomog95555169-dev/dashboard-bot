@@ -1,153 +1,204 @@
-const path = require('path');
-const fs = require('fs');
-const Database = require('better-sqlite3');
+const mongoose = require('mongoose');
 
-const DATA_DIR = path.join(__dirname, 'data');
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/oscorp';
 
-const db = new Database(path.join(DATA_DIR, 'database.sqlite'));
-db.pragma('journal_mode = WAL');
+mongoose.connect(MONGODB_URI)
+  .then(() => console.log('✅ Connected to MongoDB Atlas successfully.'))
+  .catch((err) => console.error('❌ MongoDB Connection Error:', err));
 
-db.exec(`
-CREATE TABLE IF NOT EXISTS guild_settings (
-  guild_id TEXT PRIMARY KEY,
-  prefix TEXT DEFAULT '-'
-);
+const ALIAS_LIMIT = 5;
 
-CREATE TABLE IF NOT EXISTS warnings (
-  id TEXT PRIMARY KEY,
-  guild_id TEXT NOT NULL,
-  user_id TEXT NOT NULL,
-  reason TEXT NOT NULL,
-  moderator_id TEXT NOT NULL,
-  date TEXT NOT NULL
-);
+// ---------- Schemas ----------
+const warningSchema = new mongoose.Schema({
+  guildId: String,
+  userId: String,
+  warnings: [
+    {
+      id: String,
+      reason: String,
+      moderatorId: String,
+      timestamp: { type: Date, default: Date.now },
+    },
+  ],
+});
 
-CREATE TABLE IF NOT EXISTS points (
-  guild_id TEXT NOT NULL,
-  user_id TEXT NOT NULL,
-  amount INTEGER NOT NULL DEFAULT 0,
-  PRIMARY KEY (guild_id, user_id)
-);
+const pointsSchema = new mongoose.Schema({
+  guildId: String,
+  userId: String,
+  points: { type: Number, default: 0 },
+});
 
-CREATE TABLE IF NOT EXISTS automod_settings (
-  guild_id TEXT PRIMARY KEY,
-  anti_link INTEGER NOT NULL DEFAULT 0,
-  anti_spam INTEGER NOT NULL DEFAULT 0,
-  anti_badwords INTEGER NOT NULL DEFAULT 0,
-  anti_caps INTEGER NOT NULL DEFAULT 0,
-  anti_mentions INTEGER NOT NULL DEFAULT 0,
-  punishment TEXT NOT NULL DEFAULT 'delete',
-  exempt_channels TEXT NOT NULL DEFAULT '[]',
-  exempt_roles TEXT NOT NULL DEFAULT '[]'
-);
-`);
+const settingsSchema = new mongoose.Schema({
+  guildId: { type: String, unique: true },
+  prefix: { type: String, default: '-' },
+  botName: { type: String, default: '' },
+  botActivity: { type: String, default: 'OSCORP RP' },
+  language: { type: String, default: 'ar' },
+  aliases: [
+    {
+      alias: String,
+      command: String,
+    },
+  ],
+  welcome: {
+    enabled: { type: Boolean, default: true },
+    channelId: String,
+    leaveChannelId: String,
+    message: { type: String, default: 'Welcome {user} to the server!' },
+    bgUrl: String,
+    avatarX: { type: Number, default: 250 },
+    avatarY: { type: Number, default: 100 },
+    avatarSize: { type: Number, default: 120 },
+    borderRadius: { type: Number, default: 50 },
+  },
+  moderation: {
+    modLogChannelId: String,
+    muteRoleName: { type: String, default: 'Muted' },
+    antiAlt: { type: Boolean, default: true },
+    autoWarn: { type: Boolean, default: true },
+    messageLogs: { type: Boolean, default: true },
+  },
+  automod: {
+    antiLinks: { type: Boolean, default: true },
+    antiSpam: { type: Boolean, default: true },
+    badWords: { type: Boolean, default: true },
+    antiMention: { type: Boolean, default: true },
+    antiCaps: { type: Boolean, default: false },
+  },
+  tickets: {
+    channelId: String,
+    supportRole: { type: String, default: 'Support Staff' },
+    embedTitle: { type: String, default: 'Support Center 🎟️' },
+    buttonLabel: { type: String, default: 'Open Ticket 📩' },
+  },
+  support: {
+    discordUrl: String,
+    instagramUrl: String,
+    twitterUrl: String,
+  },
+});
 
-function getPrefix(guildId) {
-  const row = db.prepare('SELECT prefix FROM guild_settings WHERE guild_id = ?').get(guildId);
-  return row ? row.prefix : '-';
+const Warning = mongoose.model('Warning', warningSchema);
+const Points = mongoose.model('Points', pointsSchema);
+const Settings = mongoose.model('Settings', settingsSchema);
+
+// ---------- Helpers ----------
+function genId() {
+  return Math.random().toString(36).slice(2, 8);
 }
 
-function setPrefix(guildId, prefix) {
-  db.prepare(`
-    INSERT INTO guild_settings (guild_id, prefix) VALUES (?, ?)
-    ON CONFLICT(guild_id) DO UPDATE SET prefix = excluded.prefix
-  `).run(guildId, prefix);
+// ---------- Settings ----------
+async function getSettings(guildId) {
+  let doc = await Settings.findOne({ guildId });
+  if (!doc) doc = await Settings.create({ guildId });
+  return doc;
 }
 
-function getWarnings(guildId, userId) {
-  return db.prepare('SELECT * FROM warnings WHERE guild_id = ? AND user_id = ? ORDER BY date ASC').all(guildId, userId);
+async function updateSettings(guildId, patch) {
+  const doc = await getSettings(guildId);
+  for (const key of Object.keys(patch)) {
+    if (typeof patch[key] === 'object' && patch[key] !== null && !Array.isArray(patch[key]) && doc[key]) {
+      Object.assign(doc[key], patch[key]);
+    } else {
+      doc[key] = patch[key];
+    }
+  }
+  await doc.save();
+  return doc;
 }
 
-function addWarning(guildId, userId, reason, moderatorId) {
-  const warning = {
-    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-    guild_id: guildId,
-    user_id: userId,
-    reason,
-    moderator_id: moderatorId,
-    date: new Date().toISOString(),
-  };
-  db.prepare(`
-    INSERT INTO warnings (id, guild_id, user_id, reason, moderator_id, date)
-    VALUES (@id, @guild_id, @user_id, @reason, @moderator_id, @date)
-  `).run(warning);
+async function getPrefix(guildId) {
+  if (!guildId) return '-';
+  const doc = await Settings.findOne({ guildId }).lean();
+  return doc && doc.prefix ? doc.prefix : '-';
+}
+
+// ---------- Aliases (5 max per guild) ----------
+async function getAliases(guildId) {
+  const doc = await Settings.findOne({ guildId }).lean();
+  return doc && doc.aliases ? doc.aliases : [];
+}
+
+async function addAlias(guildId, alias, command) {
+  const doc = await getSettings(guildId);
+  if (doc.aliases.length >= ALIAS_LIMIT) return { error: 'limit' };
+  if (doc.aliases.some((a) => a.alias.toLowerCase() === alias.toLowerCase())) return { error: 'duplicate' };
+  doc.aliases.push({ alias: alias.toLowerCase(), command });
+  await doc.save();
+  return { ok: true, aliases: doc.aliases };
+}
+
+async function removeAlias(guildId, alias) {
+  const doc = await getSettings(guildId);
+  doc.aliases = doc.aliases.filter((a) => a.alias.toLowerCase() !== alias.toLowerCase());
+  await doc.save();
+  return doc.aliases;
+}
+
+async function resolveAlias(guildId, alias) {
+  const doc = await Settings.findOne({ guildId }).lean();
+  if (!doc || !doc.aliases) return null;
+  const found = doc.aliases.find((a) => a.alias.toLowerCase() === alias.toLowerCase());
+  return found ? found.command : null;
+}
+
+// ---------- Warnings ----------
+async function getWarnings(guildId, userId) {
+  const doc = await Warning.findOne({ guildId, userId }).lean();
+  return doc ? doc.warnings : [];
+}
+
+async function addWarning(guildId, userId, reason, moderatorId) {
+  let doc = await Warning.findOne({ guildId, userId });
+  if (!doc) doc = new Warning({ guildId, userId, warnings: [] });
+  const warning = { id: genId(), reason, moderatorId, timestamp: new Date() };
+  doc.warnings.push(warning);
+  await doc.save();
   return warning;
 }
 
-function removeWarning(guildId, userId, warnId) {
-  const result = db.prepare('DELETE FROM warnings WHERE guild_id = ? AND user_id = ? AND id = ?').run(guildId, userId, warnId);
-  return result.changes > 0;
+async function removeWarning(guildId, userId, warnId) {
+  const doc = await Warning.findOne({ guildId, userId });
+  if (!doc) return false;
+  const before = doc.warnings.length;
+  doc.warnings = doc.warnings.filter((w) => w.id !== warnId);
+  if (doc.warnings.length === before) return false;
+  await doc.save();
+  return true;
 }
 
-function getPoints(guildId, userId) {
-  const row = db.prepare('SELECT amount FROM points WHERE guild_id = ? AND user_id = ?').get(guildId, userId);
-  return row ? row.amount : 0;
+// ---------- Points ----------
+async function getPoints(guildId, userId) {
+  const doc = await Points.findOne({ guildId, userId }).lean();
+  return doc ? doc.points : 0;
 }
 
-function addPoints(guildId, userId, amount) {
-  const total = getPoints(guildId, userId) + amount;
-  db.prepare(`
-    INSERT INTO points (guild_id, user_id, amount) VALUES (?, ?, ?)
-    ON CONFLICT(guild_id, user_id) DO UPDATE SET amount = excluded.amount
-  `).run(guildId, userId, total);
-  return total;
-}
-
-const DEFAULT_AUTOMOD = {
-  anti_link: false,
-  anti_spam: false,
-  anti_badwords: false,
-  anti_caps: false,
-  anti_mentions: false,
-  punishment: 'delete',
-  exempt_channels: [],
-  exempt_roles: [],
-};
-
-function getAutomodSettings(guildId) {
-  const row = db.prepare('SELECT * FROM automod_settings WHERE guild_id = ?').get(guildId);
-  if (!row) return { guild_id: guildId, ...DEFAULT_AUTOMOD };
-  return {
-    guild_id: guildId,
-    anti_link: !!row.anti_link,
-    anti_spam: !!row.anti_spam,
-    anti_badwords: !!row.anti_badwords,
-    anti_caps: !!row.anti_caps,
-    anti_mentions: !!row.anti_mentions,
-    punishment: row.punishment,
-    exempt_channels: JSON.parse(row.exempt_channels || '[]'),
-    exempt_roles: JSON.parse(row.exempt_roles || '[]'),
-  };
-}
-
-function updateAutomodSettings(guildId, partial) {
-  const merged = { ...getAutomodSettings(guildId), ...partial };
-  db.prepare(`
-    INSERT INTO automod_settings (guild_id, anti_link, anti_spam, anti_badwords, anti_caps, anti_mentions, punishment, exempt_channels, exempt_roles)
-    VALUES (@guild_id, @anti_link, @anti_spam, @anti_badwords, @anti_caps, @anti_mentions, @punishment, @exempt_channels, @exempt_roles)
-    ON CONFLICT(guild_id) DO UPDATE SET
-      anti_link = excluded.anti_link, anti_spam = excluded.anti_spam,
-      anti_badwords = excluded.anti_badwords, anti_caps = excluded.anti_caps,
-      anti_mentions = excluded.anti_mentions, punishment = excluded.punishment,
-      exempt_channels = excluded.exempt_channels, exempt_roles = excluded.exempt_roles
-  `).run({
-    guild_id: guildId,
-    anti_link: merged.anti_link ? 1 : 0,
-    anti_spam: merged.anti_spam ? 1 : 0,
-    anti_badwords: merged.anti_badwords ? 1 : 0,
-    anti_caps: merged.anti_caps ? 1 : 0,
-    anti_mentions: merged.anti_mentions ? 1 : 0,
-    punishment: merged.punishment,
-    exempt_channels: JSON.stringify(merged.exempt_channels || []),
-    exempt_roles: JSON.stringify(merged.exempt_roles || []),
-  });
-  return getAutomodSettings(guildId);
+async function addPoints(guildId, userId, amount) {
+  let doc = await Points.findOne({ guildId, userId });
+  if (!doc) {
+    doc = new Points({ guildId, userId, points: amount });
+  } else {
+    doc.points += amount;
+  }
+  await doc.save();
+  return doc.points;
 }
 
 module.exports = {
-  db, getPrefix, setPrefix,
-  getWarnings, addWarning, removeWarning,
-  getPoints, addPoints,
-  getAutomodSettings, updateAutomodSettings,
+  ALIAS_LIMIT,
+  getSettings,
+  updateSettings,
+  getPrefix,
+  getAliases,
+  addAlias,
+  removeAlias,
+  resolveAlias,
+  getWarnings,
+  addWarning,
+  removeWarning,
+  getPoints,
+  addPoints,
+  Warning,
+  Points,
+  Settings,
 };

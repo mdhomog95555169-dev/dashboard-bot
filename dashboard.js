@@ -1,5 +1,7 @@
 const express = require('express');
 const session = require('express-session');
+const { getSettings, updateSettings, addAlias, removeAlias, ALIAS_LIMIT } = require('./database');
+const { commands } = require('./commands');
 
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
@@ -23,11 +25,11 @@ async function fetchGuildChannels(guildId) {
   if (!DISCORD_TOKEN) return [];
   try {
     const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}/channels`, {
-      headers: { Authorization: `Bot ${DISCORD_TOKEN}` }
+      headers: { Authorization: `Bot ${DISCORD_TOKEN}` },
     });
     if (!res.ok) return [];
     const channels = await res.json();
-    return channels.filter(c => c.type === 0);
+    return channels.filter((c) => c.type === 0);
   } catch (err) {
     return [];
   }
@@ -60,7 +62,7 @@ function landingPage() {
   return layout('OS System Engine | OSCORP RP', `
   <div class="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden">
     <div class="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(99,102,241,0.25),transparent_70%)]"></div>
-    
+
     <div class="relative z-10 text-center max-w-3xl">
       <span class="inline-block px-5 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-sm font-bold mb-6">
         🚀 OSCORP RP Bot Engine Ultimate v3.0
@@ -69,7 +71,7 @@ function landingPage() {
       <p class="text-gray-300 text-lg md:text-xl mb-10 leading-relaxed font-medium">
         المحرك الإداري الأقوى لإدارة وتأمين سيرفرات ديسكورد بالكامل مع نظام تذاكر وترحيب مخصص وحماية فائقة.
       </p>
-      
+
       <div class="flex flex-col sm:flex-row gap-4 justify-center mb-12">
         <a href="/login" class="glow px-8 py-4 rounded-2xl bg-gradient-to-r from-indigo-500 via-indigo-600 to-blue-600 font-extrabold text-white hover:scale-105 transition-all duration-300 flex items-center justify-center gap-2">
           🔑 تسجيل الدخول عبر Discord
@@ -99,7 +101,7 @@ function dashboardPage(user, guilds) {
           </div>
         </div>
         <a href="/dashboard/${g.id}" class="glow px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 font-extrabold text-sm text-white hover:scale-105 transition-all">
-          إدارة السيرفر
+          Open Dashboard →
         </a>
       </div>`).join('')
     : `<p class="text-gray-400 col-span-full text-center py-10 glass rounded-2xl">لا تملك صلاحيات أدمن في أي سيرفر حالياً.</p>`;
@@ -116,40 +118,285 @@ function dashboardPage(user, guilds) {
   <div class="max-w-5xl mx-auto px-6 py-12 w-full">
     <div class="mb-8">
       <h2 class="text-3xl font-black text-white mb-2">سيرفراتك</h2>
-      <p class="text-gray-400 text-sm font-medium">اختر السيرفر لتخصيص كامل الإعدادات والرومات والحماية</p>
+      <p class="text-gray-400 text-sm font-medium">اختر السيرفر للدخول مباشرة إلى لوحة إعداداته الكاملة</p>
     </div>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">${guildCards}</div>
   </div>`);
 }
 
-function guildManagePage(user, guildId, currentTab = 'settings', channels = []) {
+function checkbox(name, checked) {
+  return `<input type="checkbox" name="${name}" ${checked ? 'checked' : ''} class="w-6 h-6 accent-indigo-600" />`;
+}
+
+function channelSelect(channels, selectedId, fieldName) {
+  const opts = channels.length
+    ? channels.map((c) => `<option value="${c.id}" ${c.id === selectedId ? 'selected' : ''} class="bg-gray-900"># ${c.name}</option>`).join('')
+    : `<option value="" class="bg-gray-900">No channels found</option>`;
+  return `<select name="${fieldName}" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500">
+    <option value="" class="bg-gray-900">— None —</option>
+    ${opts}
+  </select>`;
+}
+
+function guildManagePage(user, guildId, currentTab, channels, settings, flags = {}) {
   const avatar = user.avatar
     ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`
     : `https://cdn.discordapp.com/embed/avatars/${Number(user.discriminator || 0) % 5}.png`;
 
-  const channelOptions = channels.length > 0
-    ? channels.map(c => `<option value="${c.id}" class="bg-gray-900"># ${c.name}</option>`).join('')
-    : `<option value="" class="bg-gray-900">تحديد قناة...</option>`;
-
   const tabs = [
-    { id: 'settings', name: '⚙️ الإعدادات العامة' },
-    { id: 'welcome', name: '🎉 الترحيب والمغادرة' },
-    { id: 'moderation', name: '⚔️ الإشراف والإدارة' },
-    { id: 'automod', name: '🛡️ الحماية المتقدمة (AutoMod)' },
-    { id: 'tickets', name: '🎫 إدارة التذاكر' },
-    { id: 'support', name: '💬 الدعم والروابط' }
+    { id: 'settings', name: '⚙️ General Settings' },
+    { id: 'moderation', name: '⚔️ Moderation System' },
+    { id: 'welcome', name: '🎉 Welcome System' },
+    { id: 'automod', name: '🛡️ AutoMod / Protection' },
+    { id: 'tickets', name: '🎫 Ticket System' },
+    { id: 'support', name: '💬 Support & Links' },
   ];
 
-  const navTabs = tabs.map(t => `
+  const navTabs = tabs.map((t) => `
     <a href="/dashboard/${guildId}?tab=${t.id}" class="px-5 py-3 rounded-xl font-extrabold text-sm transition-all flex items-center gap-2 ${currentTab === t.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/40 border border-indigo-400/30' : 'glass text-gray-400 hover:text-white'}">
       ${t.name}
     </a>
   `).join('');
 
-  return layout(`إدارة السيرفر | OS Engine`, `
+  const savedBanner = flags.saved ? `<div class="mb-6 px-5 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-bold text-sm">✅ Changes saved successfully!</div>` : '';
+  const aliasLimitBanner = flags.aliasError === 'limit' ? `<div class="mb-6 px-5 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 font-bold text-sm">You have reached the 5-alias limit!</div>` : '';
+  const aliasDupBanner = flags.aliasError === 'duplicate' ? `<div class="mb-6 px-5 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 font-bold text-sm">This alias already exists.</div>` : '';
+
+  const moderationCommandNames = commands.filter((c) => c.permission).map((c) => c.name);
+  const aliasRows = (settings.aliases || []).length
+    ? settings.aliases.map((a) => `
+        <div class="flex items-center justify-between p-3 glass rounded-xl border border-white/5">
+          <span class="font-bold text-white text-sm">-${a.alias} → /${a.command}</span>
+          <form method="POST" action="/dashboard/${guildId}/aliases/remove">
+            <input type="hidden" name="alias" value="${a.alias}" />
+            <button type="submit" class="text-xs px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 font-bold hover:bg-red-500/20">Remove</button>
+          </form>
+        </div>`).join('')
+    : `<p class="text-gray-400 text-sm">No custom aliases yet.</p>`;
+  const aliasOptions = moderationCommandNames.map((n) => `<option value="${n}" class="bg-gray-900">/${n}</option>`).join('');
+  const aliasFull = (settings.aliases || []).length >= ALIAS_LIMIT;
+
+  let content = '';
+  if (currentTab === 'settings') {
+    content = `
+      <h3 class="text-2xl font-black mb-6 flex items-center gap-2">⚙️ General Settings</h3>
+      <form method="POST" action="/dashboard/${guildId}/settings" class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-sm font-bold text-gray-300 mb-2">Bot Nickname in this server</label>
+            <input type="text" name="botName" value="${settings.botName || ''}" placeholder="OSCORP RP Bot" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-300 mb-2">Command Prefix</label>
+            <input type="text" name="prefix" value="${settings.prefix || '-'}" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" />
+          </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-sm font-bold text-gray-300 mb-2">Bot Language</label>
+            <select name="language" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500">
+              <option value="ar" ${settings.language === 'ar' ? 'selected' : ''} class="bg-gray-900">العربية (Arabic)</option>
+              <option value="en" ${settings.language === 'en' ? 'selected' : ''} class="bg-gray-900">English</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-300 mb-2">Bot Activity Status</label>
+            <input type="text" name="botActivity" value="${settings.botActivity || ''}" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" />
+          </div>
+        </div>
+        <button type="submit" class="glow px-8 py-3.5 rounded-xl bg-indigo-600 font-extrabold text-white hover:bg-indigo-500 transition-all">Save Changes</button>
+      </form>`;
+  } else if (currentTab === 'moderation') {
+    content = `
+      <h3 class="text-2xl font-black mb-6 flex items-center gap-2">⚔️ Moderation System</h3>
+      <form method="POST" action="/dashboard/${guildId}/moderation" class="space-y-6 mb-10">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-sm font-bold text-gray-300 mb-2">Mod Log Channel</label>
+            ${channelSelect(channels, settings.moderation?.modLogChannelId, 'modLogChannelId')}
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-300 mb-2">Mute Role Name</label>
+            <input type="text" name="muteRoleName" value="${settings.moderation?.muteRoleName || 'Muted'}" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" />
+          </div>
+        </div>
+        <div class="space-y-4">
+          <div class="flex items-center justify-between p-4 glass rounded-2xl border border-white/5">
+            <div><div class="font-bold text-white">Anti-Alt Accounts</div><div class="text-xs text-gray-400">Kick or ban accounts younger than 7 days</div></div>
+            ${checkbox('antiAlt', settings.moderation?.antiAlt)}
+          </div>
+          <div class="flex items-center justify-between p-4 glass rounded-2xl border border-white/5">
+            <div><div class="font-bold text-white">Auto Warn System</div><div class="text-xs text-gray-400">Auto-mute after 3 warnings, auto-ban after 5</div></div>
+            ${checkbox('autoWarn', settings.moderation?.autoWarn)}
+          </div>
+          <div class="flex items-center justify-between p-4 glass rounded-2xl border border-white/5">
+            <div><div class="font-bold text-white">Message Logs</div><div class="text-xs text-gray-400">Log edited and deleted messages</div></div>
+            ${checkbox('messageLogs', settings.moderation?.messageLogs)}
+          </div>
+        </div>
+        <button type="submit" class="glow px-8 py-3.5 rounded-xl bg-indigo-600 font-extrabold text-white hover:bg-indigo-500 transition-all">Save Moderation Settings</button>
+      </form>
+
+      <div class="border-t border-white/10 pt-8">
+        <h4 class="text-xl font-black mb-1 flex items-center gap-2">🔗 Custom Command Aliases</h4>
+        <p class="text-gray-400 text-sm mb-4">You can add up to ${ALIAS_LIMIT} custom aliases (${(settings.aliases || []).length}/${ALIAS_LIMIT} used).</p>
+        <div class="space-y-3 mb-5">${aliasRows}</div>
+        <form method="POST" action="/dashboard/${guildId}/aliases/add" class="flex flex-col md:flex-row gap-3">
+          <input type="text" name="alias" placeholder="e.g. b" required ${aliasFull ? 'disabled' : ''} class="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 disabled:opacity-40" />
+          <select name="command" ${aliasFull ? 'disabled' : ''} class="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 disabled:opacity-40">
+            ${aliasOptions}
+          </select>
+          <button type="submit" ${aliasFull ? 'disabled' : ''} class="px-6 py-3 rounded-xl bg-indigo-600 font-extrabold text-white hover:bg-indigo-500 disabled:opacity-40 transition-all">Add Alias</button>
+        </form>
+      </div>`;
+  } else if (currentTab === 'welcome') {
+    content = `
+      <h3 class="text-2xl font-black mb-6 flex items-center gap-2">🎉 Welcome System</h3>
+      <form method="POST" action="/dashboard/${guildId}/welcome" class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-sm font-bold text-gray-300 mb-2">Welcome Channel</label>
+            ${channelSelect(channels, settings.welcome?.channelId, 'channelId')}
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-300 mb-2">Leave Channel</label>
+            ${channelSelect(channels, settings.welcome?.leaveChannelId, 'leaveChannelId')}
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-bold text-gray-300 mb-2">Custom Welcome Message</label>
+          <textarea name="message" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 h-24" placeholder="Welcome {user} to the server! 🌟">${settings.welcome?.message || ''}</textarea>
+        </div>
+
+        <div class="p-6 glass rounded-2xl border border-indigo-500/20 space-y-4">
+          <h4 class="font-extrabold text-indigo-400 text-lg flex items-center gap-2">🖼️ Welcome Card Image Settings</h4>
+          <div>
+            <label class="block text-sm font-bold text-gray-300 mb-2">Background Image URL</label>
+            <input type="text" name="bgUrl" value="${settings.welcome?.bgUrl || ''}" placeholder="https://i.imgur.com/example.png" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" />
+          </div>
+          <div class="border-t border-white/10 pt-4">
+            <label class="block text-sm font-bold text-gray-300 mb-3">📍 Avatar position &amp; size on the card</label>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-gray-400 mb-1">Avatar X</label>
+                <input type="number" name="avatarX" value="${settings.welcome?.avatarX ?? 250}" class="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-400 mb-1">Avatar Y</label>
+                <input type="number" name="avatarY" value="${settings.welcome?.avatarY ?? 100}" class="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-400 mb-1">Avatar Size</label>
+                <input type="number" name="avatarSize" value="${settings.welcome?.avatarSize ?? 120}" class="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-400 mb-1">Border Radius</label>
+                <input type="number" name="borderRadius" value="${settings.welcome?.borderRadius ?? 50}" class="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+          ${checkbox('enabled', settings.welcome?.enabled)}
+          <label class="text-sm font-bold text-gray-300">Enable welcome card image</label>
+        </div>
+        <button type="submit" class="glow px-8 py-3.5 rounded-xl bg-indigo-600 font-extrabold text-white hover:bg-indigo-500 transition-all">Save Welcome Settings</button>
+      </form>`;
+  } else if (currentTab === 'automod') {
+    content = `
+      <h3 class="text-2xl font-black mb-6 flex items-center gap-2">🛡️ AutoMod / Protection</h3>
+      <form method="POST" action="/dashboard/${guildId}/automod" class="space-y-4">
+        <div class="flex items-center justify-between p-4 glass rounded-2xl border border-white/5">
+          <div><div class="font-bold text-white">Anti-Links</div><div class="text-xs text-gray-400">Auto-delete external links and Discord invites</div></div>
+          ${checkbox('antiLinks', settings.automod?.antiLinks)}
+        </div>
+        <div class="flex items-center justify-between p-4 glass rounded-2xl border border-white/5">
+          <div><div class="font-bold text-white">Anti-Spam</div><div class="text-xs text-gray-400">Prevent rapid repeated messages</div></div>
+          ${checkbox('antiSpam', settings.automod?.antiSpam)}
+        </div>
+        <div class="flex items-center justify-between p-4 glass rounded-2xl border border-white/5">
+          <div><div class="font-bold text-white">Bad Words Filter</div><div class="text-xs text-gray-400">Auto-delete messages containing banned words</div></div>
+          ${checkbox('badWords', settings.automod?.badWords)}
+        </div>
+        <div class="flex items-center justify-between p-4 glass rounded-2xl border border-white/5">
+          <div><div class="font-bold text-white">Anti-Mass Mention</div><div class="text-xs text-gray-400">Block messages with more than 5 mentions</div></div>
+          ${checkbox('antiMention', settings.automod?.antiMention)}
+        </div>
+        <div class="flex items-center justify-between p-4 glass rounded-2xl border border-white/5">
+          <div><div class="font-bold text-white">Anti-Caps</div><div class="text-xs text-gray-400">Delete messages written fully in uppercase</div></div>
+          ${checkbox('antiCaps', settings.automod?.antiCaps)}
+        </div>
+        <button type="submit" class="glow px-8 py-3.5 rounded-xl bg-indigo-600 font-extrabold text-white hover:bg-indigo-500 transition-all">Save AutoMod Settings</button>
+      </form>`;
+  } else if (currentTab === 'tickets') {
+    content = `
+      <h3 class="text-2xl font-black mb-6 flex items-center gap-2">🎫 Ticket System</h3>
+      <form method="POST" action="/dashboard/${guildId}/tickets" class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-sm font-bold text-gray-300 mb-2">Target Channel for Ticket Panel</label>
+            ${channelSelect(channels, settings.tickets?.channelId, 'channelId')}
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-300 mb-2">Support Role Name</label>
+            <input type="text" name="supportRole" value="${settings.tickets?.supportRole || 'Support Staff'}" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" />
+          </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-sm font-bold text-gray-300 mb-2">Ticket Panel Embed Title</label>
+            <input type="text" name="embedTitle" value="${settings.tickets?.embedTitle || 'Support Center 🎟️'}" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-300 mb-2">Ticket Button Label</label>
+            <input type="text" name="buttonLabel" value="${settings.tickets?.buttonLabel || 'Open Ticket 📩'}" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" />
+          </div>
+        </div>
+        <button type="submit" class="glow px-8 py-3.5 rounded-xl bg-indigo-600 font-extrabold text-white hover:bg-indigo-500 transition-all">Save Ticket Settings</button>
+      </form>`;
+  } else {
+    content = `
+      <h3 class="text-2xl font-black mb-6 flex items-center gap-2">💬 Support & Links</h3>
+      <form method="POST" action="/dashboard/${guildId}/support" class="space-y-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div>
+            <label class="block text-sm font-bold text-gray-300 mb-2">Support Server Invite</label>
+            <input type="text" name="discordUrl" value="${settings.support?.discordUrl || ''}" placeholder="https://discord.gg/..." class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-300 mb-2">Instagram URL</label>
+            <input type="text" name="instagramUrl" value="${settings.support?.instagramUrl || ''}" placeholder="https://instagram.com/..." class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-300 mb-2">Twitter / X URL</label>
+            <input type="text" name="twitterUrl" value="${settings.support?.twitterUrl || ''}" placeholder="https://x.com/..." class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" />
+          </div>
+        </div>
+        <button type="submit" class="glow px-8 py-3.5 rounded-xl bg-indigo-600 font-extrabold text-white hover:bg-indigo-500 transition-all">Save Links</button>
+      </form>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <a href="${settings.support?.discordUrl || '#'}" target="_blank" class="p-5 glass rounded-2xl flex items-center gap-4 hover:border-indigo-500/50 transition-all">
+          <div class="text-2xl">🎧</div>
+          <div><div class="font-bold text-white">Support Server</div><div class="text-xs text-gray-400">Join for help</div></div>
+        </a>
+        <a href="${settings.support?.instagramUrl || '#'}" target="_blank" class="p-5 glass rounded-2xl flex items-center gap-4 hover:border-pink-500/50 transition-all">
+          <div class="text-2xl">📸</div>
+          <div><div class="font-bold text-white">Instagram</div><div class="text-xs text-gray-400">Follow us</div></div>
+        </a>
+        <a href="${settings.support?.twitterUrl || '#'}" target="_blank" class="p-5 glass rounded-2xl flex items-center gap-4 hover:border-blue-500/50 transition-all">
+          <div class="text-2xl">🌐</div>
+          <div><div class="font-bold text-white">Twitter / X</div><div class="text-xs text-gray-400">Latest updates</div></div>
+        </a>
+      </div>`;
+  }
+
+  return layout(`Server Dashboard | OS Engine`, `
   <nav class="flex items-center justify-between px-8 py-5 glass border-b border-white/10">
     <div class="flex items-center gap-4">
-      <a href="/dashboard" class="text-xs px-3.5 py-2 rounded-xl glass text-gray-300 hover:text-white font-bold">← العودة للرئيسية</a>
+      <a href="/dashboard" class="text-xs px-3.5 py-2 rounded-xl glass text-gray-300 hover:text-white font-bold">← Back to servers</a>
       <span class="font-extrabold text-xl gradient-text">OS Control Center</span>
     </div>
     <div class="flex items-center gap-3">
@@ -163,224 +410,18 @@ function guildManagePage(user, guildId, currentTab = 'settings', channels = []) 
       ${navTabs}
     </div>
 
+    ${savedBanner}${aliasLimitBanner}${aliasDupBanner}
+
     <div class="glass p-8 rounded-3xl border border-white/10">
-      ${currentTab === 'settings' ? `
-        <h3 class="text-2xl font-black mb-6 flex items-center gap-2">⚙️ الإعدادات العامة الشاملة</h3>
-        <form class="space-y-6">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label class="block text-sm font-bold text-gray-300 mb-2">اسم البوت المستعار داخل السيرفر</label>
-              <input type="text" placeholder="OSCORP RP Bot" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" />
-            </div>
-            <div>
-              <label class="block text-sm font-bold text-gray-300 mb-2">البريفكس الخاص بالأوامر (Prefix)</label>
-              <input type="text" value="-" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" />
-            </div>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label class="block text-sm font-bold text-gray-300 mb-2">لغة البوت الرئيسية</label>
-              <select class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500">
-                <option class="bg-gray-900">العربية (Arabic)</option>
-                <option class="bg-gray-900">English</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-bold text-gray-300 mb-2">حالة نشاط البوت (Bot Activity)</label>
-              <input type="text" value="إدارة OSCORP RP ⚡" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" />
-            </div>
-          </div>
-          <button type="button" class="glow px-8 py-3.5 rounded-xl bg-indigo-600 font-extrabold text-white hover:bg-indigo-500 transition-all">حفظ التغيرات</button>
-        </form>
-
-      ` : currentTab === 'welcome' ? `
-        <h3 class="text-2xl font-black mb-6 flex items-center gap-2">🎉 نظام الترحيب والمغادرة المطور + كرت الصورة Custom</h3>
-        <form class="space-y-6" enctype="multipart/form-data">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label class="block text-sm font-bold text-gray-300 mb-2">تحديد قناة الترحيب (Welcome Channel)</label>
-              <select class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500">
-                ${channelOptions}
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-bold text-gray-300 mb-2">تحديد قناة المغادرة (Leave Channel)</label>
-              <select class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500">
-                ${channelOptions}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-sm font-bold text-gray-300 mb-2">رسالة الترحيب النصية المخصصة</label>
-            <textarea class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 h-24" placeholder="مرحباً بك {user} في سيرفرنا! نورت المكان 🌟"></textarea>
-          </div>
-
-          <div class="p-6 glass rounded-2xl border border-indigo-500/20 space-y-4">
-            <h4 class="font-extrabold text-indigo-400 text-lg flex items-center gap-2">🖼️ إعدادات صورة كرت الترحيب والكركتر (Avatar Canvas)</h4>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label class="block text-sm font-bold text-gray-300 mb-2">رفع صورة الخلفية (Upload Background Image)</label>
-                <input type="file" accept="image/*" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500" />
-              </div>
-              <div>
-                <label class="block text-sm font-bold text-gray-300 mb-2">أو رابط خلفية مباشر (Image URL)</label>
-                <input type="text" placeholder="https://i.imgur.com/example.png" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" />
-              </div>
-            </div>
-
-            <div class="border-t border-white/10 pt-4">
-              <label class="block text-sm font-bold text-gray-300 mb-3">📍 التحكم في موضع وحجم صوّرة العضو (User Avatar position X, Y, Size):</label>
-              <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <label class="block text-xs font-bold text-gray-400 mb-1">الموقع الأفقي (Avatar X)</label>
-                  <input type="number" value="250" class="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500" />
-                </div>
-                <div>
-                  <label class="block text-xs font-bold text-gray-400 mb-1">الموقع الرأسي (Avatar Y)</label>
-                  <input type="number" value="100" class="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500" />
-                </div>
-                <div>
-                  <label class="block text-xs font-bold text-gray-400 mb-1">حجم الصورة (Avatar Size)</label>
-                  <input type="number" value="120" class="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500" />
-                </div>
-                <div>
-                  <label class="block text-xs font-bold text-gray-400 mb-1">تدوير الحواف (Border Radius)</label>
-                  <input type="number" value="50" class="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500" placeholder="50% للدائري" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="flex items-center gap-4">
-            <input type="checkbox" id="welcome_card" checked class="w-5 h-5 accent-indigo-600" />
-            <label for="welcome_card" class="text-sm font-bold text-gray-300">تفعيل إرسال كرت صورة الترحيب المباشرة</label>
-          </div>
-          <button type="button" class="glow px-8 py-3.5 rounded-xl bg-indigo-600 font-extrabold text-white hover:bg-indigo-500 transition-all">حفظ الإعدادات بالكامل</button>
-        </form>
-
-      ` : currentTab === 'moderation' ? `
-        <h3 class="text-2xl font-black mb-6 flex items-center gap-2">⚔️ نظام الإشراف والعقوبات المتقدم (Moderation Engine)</h3>
-        <form class="space-y-6">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label class="block text-sm font-bold text-gray-300 mb-2">قناة سجل العقوبات والإداريات (Mod Log Channel)</label>
-              <select class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500">
-                ${channelOptions}
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-bold text-gray-300 mb-2">رتبة الميوت التلقائية (Mute Role)</label>
-              <input type="text" placeholder="Muted" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" />
-            </div>
-          </div>
-
-          <div class="space-y-4">
-            <div class="flex items-center justify-between p-4 glass rounded-2xl border border-white/5">
-              <div><div class="font-bold text-white">حظر الحسابات الوهمية والجديدة (Anti-Alt Accounts)</div><div class="text-xs text-gray-400">طرد أو حظر الحسابات التي أنشئت منذ أقل من 7 أيام</div></div>
-              <input type="checkbox" checked class="w-6 h-6 accent-indigo-600" />
-            </div>
-            <div class="flex items-center justify-between p-4 glass rounded-2xl border border-white/5">
-              <div><div class="font-bold text-white">نظام التحذيرات التلقائي (Auto Warn System)</div><div class="text-xs text-gray-400">إعطاء ميوت تلقائي بعد 3 تحذيرات وبان بعد 5 تحذيرات</div></div>
-              <input type="checkbox" checked class="w-6 h-6 accent-indigo-600" />
-            </div>
-            <div class="flex items-center justify-between p-4 glass rounded-2xl border border-white/5">
-              <div><div class="font-bold text-white">سجل تعديل وحذف الرسائل (Message Logs)</div><div class="text-xs text-gray-400">تسجيل أي رسالة تم تعديلها أو حذفها داخل السيرفر</div></div>
-              <input type="checkbox" checked class="w-6 h-6 accent-indigo-600" />
-            </div>
-          </div>
-          <button type="button" class="glow px-8 py-3.5 rounded-xl bg-indigo-600 font-extrabold text-white hover:bg-indigo-500 transition-all">حفظ إعدادات الإشراف</button>
-        </form>
-
-      ` : currentTab === 'automod' ? `
-        <h3 class="text-2xl font-black mb-6 flex items-center gap-2">🛡️ نظام الحماية المتقدم x100 (AutoMod)</h3>
-        <div class="space-y-4">
-          <div class="flex items-center justify-between p-4 glass rounded-2xl border border-white/5">
-            <div><div class="font-bold text-white">حظر الروابط المباشرة (Anti-Links)</div><div class="text-xs text-gray-400">حذف كافة الروابط الخارجية ودعوات الديسكورد تلقائياً</div></div>
-            <input type="checkbox" checked class="w-6 h-6 accent-indigo-600" />
-          </div>
-          <div class="flex items-center justify-between p-4 glass rounded-2xl border border-white/5">
-            <div><div class="font-bold text-white">منع السبام والتكرار (Anti-Spam)</div><div class="text-xs text-gray-400">منع إرسال الرسائل المتكررة بسرعة عالية</div></div>
-            <input type="checkbox" checked class="w-6 h-6 accent-indigo-600" />
-          </div>
-          <div class="flex items-center justify-between p-4 glass rounded-2xl border border-white/5">
-            <div><div class="font-bold text-white">تصفية الكلمات البذيئة (Bad Words Filter)</div><div class="text-xs text-gray-400">حذف الرسائل التي تحتوي على كلمات محظورة تلقائياً</div></div>
-            <input type="checkbox" checked class="w-6 h-6 accent-indigo-600" />
-          </div>
-          <div class="flex items-center justify-between p-4 glass rounded-2xl border border-white/5">
-            <div><div class="font-bold text-white">حظر المنشن المفرط (Anti-Mass Mention)</div><div class="text-xs text-gray-400">حظر الرسائل التي تحتوي على أكثر من 5 تاغات</div></div>
-            <input type="checkbox" checked class="w-6 h-6 accent-indigo-600" />
-          </div>
-          <div class="flex items-center justify-between p-4 glass rounded-2xl border border-white/5">
-            <div><div class="font-bold text-white">منع الأحرف الكبيرة المفرطة (Anti-Caps)</div><div class="text-xs text-gray-400">حذف الرسائل المكتوبة بالكامل باللغة الإنجليزية الكبيرة</div></div>
-            <input type="checkbox" class="w-6 h-6 accent-indigo-600" />
-          </div>
-        </div>
-
-      ` : currentTab === 'tickets' ? `
-        <h3 class="text-2xl font-black mb-6 flex items-center gap-2">🎫 نظام التذاكر الاحترافي x1000000</h3>
-        <form class="space-y-6">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label class="block text-sm font-bold text-gray-300 mb-2">القناة المحددة لإرسال لوحة التذاكر (Target Channel)</label>
-              <select class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500">
-                ${channelOptions}
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-bold text-gray-300 mb-2">اسم رتبة الدعم الفني المسؤولة (Support Role)</label>
-              <input type="text" placeholder="Support Staff" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" />
-            </div>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label class="block text-sm font-bold text-gray-300 mb-2">عنوان كرت التذكرة (Embed Title)</label>
-              <input type="text" value="مركز الدعم الفني والخدمات 🎟️" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" />
-            </div>
-            <div>
-              <label class="block text-sm font-bold text-gray-300 mb-2">نص زر إنشاء التذكرة (Button Label)</label>
-              <input type="text" value="فتح تذكرة دعم 📩" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" />
-            </div>
-          </div>
-          <button type="button" class="glow px-8 py-3.5 rounded-xl bg-indigo-600 font-extrabold text-white hover:bg-indigo-500 transition-all">إرسال وتثبيت لوحة التذاكر في الروم</button>
-        </form>
-
-      ` : `
-        <h3 class="text-2xl font-black mb-6 flex items-center gap-2">💬 الدعم الفني والتواصل المباشر</h3>
-        <p class="text-gray-300 mb-6 font-medium">يمكنك التواصل مع المطور والدعم الفني عبر وسائل التواصل الاجتماعية التالية:</p>
-        
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <a href="https://discord.gg" target="_blank" class="p-5 glass rounded-2xl flex items-center gap-4 hover:border-indigo-500/50 transition-all">
-            <div class="text-2xl">🎧</div>
-            <div>
-              <div class="font-bold text-white">سيرفر الدعم</div>
-              <div class="text-xs text-gray-400">انضمام لمساعدتك</div>
-            </div>
-          </a>
-          <a href="https://instagram.com" target="_blank" class="p-5 glass rounded-2xl flex items-center gap-4 hover:border-pink-500/50 transition-all">
-            <div class="text-2xl">📸</div>
-            <div>
-              <div class="font-bold text-white">انستقرام</div>
-              <div class="text-xs text-gray-400">تابع جديدنا</div>
-            </div>
-          </a>
-          <a href="https://x.com" target="_blank" class="p-5 glass rounded-2xl flex items-center gap-4 hover:border-blue-500/50 transition-all">
-            <div class="text-2xl">🌐</div>
-            <div>
-              <div class="font-bold text-white">تويتر / X</div>
-              <div class="text-xs text-gray-400">تحديثات المشروع</div>
-            </div>
-          </a>
-        </div>
-      `}
+      ${content}
     </div>
   </div>`);
 }
 
-function createApp() {
+function createApp(client) {
   const app = express();
   app.set('trust proxy', 1);
+  app.use(express.urlencoded({ extended: true }));
   app.use(session({
     secret: SESSION_SECRET,
     resave: false,
@@ -443,8 +484,113 @@ function createApp() {
   app.get('/dashboard/:guildId', async (req, res) => {
     if (!req.session.user) return res.redirect('/login');
     const tab = req.query.tab || 'settings';
-    const channels = await fetchGuildChannels(req.params.guildId);
-    res.send(guildManagePage(req.session.user, req.params.guildId, tab, channels));
+    const [channels, settings] = await Promise.all([
+      fetchGuildChannels(req.params.guildId),
+      getSettings(req.params.guildId),
+    ]);
+    const flags = { saved: req.query.saved === '1', aliasError: req.query.alias_error };
+    res.send(guildManagePage(req.session.user, req.params.guildId, tab, channels, settings, flags));
+  });
+
+  app.post('/dashboard/:guildId/settings', async (req, res) => {
+    if (!req.session.user) return res.redirect('/login');
+    const { botName, prefix, language, botActivity } = req.body;
+    await updateSettings(req.params.guildId, {
+      botName: botName || '',
+      prefix: prefix || '-',
+      language: language || 'ar',
+      botActivity: botActivity || '',
+    });
+    res.redirect(`/dashboard/${req.params.guildId}?tab=settings&saved=1`);
+  });
+
+  app.post('/dashboard/:guildId/moderation', async (req, res) => {
+    if (!req.session.user) return res.redirect('/login');
+    const { modLogChannelId, muteRoleName, antiAlt, autoWarn, messageLogs } = req.body;
+    await updateSettings(req.params.guildId, {
+      moderation: {
+        modLogChannelId: modLogChannelId || '',
+        muteRoleName: muteRoleName || 'Muted',
+        antiAlt: !!antiAlt,
+        autoWarn: !!autoWarn,
+        messageLogs: !!messageLogs,
+      },
+    });
+    res.redirect(`/dashboard/${req.params.guildId}?tab=moderation&saved=1`);
+  });
+
+  app.post('/dashboard/:guildId/aliases/add', async (req, res) => {
+    if (!req.session.user) return res.redirect('/login');
+    const { alias, command } = req.body;
+    const cleanAlias = (alias || '').trim().toLowerCase().replace(/\s+/g, '');
+    if (!cleanAlias || !command) return res.redirect(`/dashboard/${req.params.guildId}?tab=moderation`);
+    const result = await addAlias(req.params.guildId, cleanAlias, command);
+    if (result.error) return res.redirect(`/dashboard/${req.params.guildId}?tab=moderation&alias_error=${result.error}`);
+    res.redirect(`/dashboard/${req.params.guildId}?tab=moderation&saved=1`);
+  });
+
+  app.post('/dashboard/:guildId/aliases/remove', async (req, res) => {
+    if (!req.session.user) return res.redirect('/login');
+    const { alias } = req.body;
+    await removeAlias(req.params.guildId, alias);
+    res.redirect(`/dashboard/${req.params.guildId}?tab=moderation&saved=1`);
+  });
+
+  app.post('/dashboard/:guildId/welcome', async (req, res) => {
+    if (!req.session.user) return res.redirect('/login');
+    const { channelId, leaveChannelId, message, bgUrl, avatarX, avatarY, avatarSize, borderRadius, enabled } = req.body;
+    await updateSettings(req.params.guildId, {
+      welcome: {
+        channelId: channelId || '',
+        leaveChannelId: leaveChannelId || '',
+        message: message || '',
+        bgUrl: bgUrl || '',
+        avatarX: Number(avatarX) || 250,
+        avatarY: Number(avatarY) || 100,
+        avatarSize: Number(avatarSize) || 120,
+        borderRadius: Number(borderRadius) || 50,
+        enabled: !!enabled,
+      },
+    });
+    res.redirect(`/dashboard/${req.params.guildId}?tab=welcome&saved=1`);
+  });
+
+  app.post('/dashboard/:guildId/automod', async (req, res) => {
+    if (!req.session.user) return res.redirect('/login');
+    const { antiLinks, antiSpam, badWords, antiMention, antiCaps } = req.body;
+    await updateSettings(req.params.guildId, {
+      automod: {
+        antiLinks: !!antiLinks,
+        antiSpam: !!antiSpam,
+        badWords: !!badWords,
+        antiMention: !!antiMention,
+        antiCaps: !!antiCaps,
+      },
+    });
+    res.redirect(`/dashboard/${req.params.guildId}?tab=automod&saved=1`);
+  });
+
+  app.post('/dashboard/:guildId/tickets', async (req, res) => {
+    if (!req.session.user) return res.redirect('/login');
+    const { channelId, supportRole, embedTitle, buttonLabel } = req.body;
+    await updateSettings(req.params.guildId, {
+      tickets: {
+        channelId: channelId || '',
+        supportRole: supportRole || 'Support Staff',
+        embedTitle: embedTitle || 'Support Center 🎟️',
+        buttonLabel: buttonLabel || 'Open Ticket 📩',
+      },
+    });
+    res.redirect(`/dashboard/${req.params.guildId}?tab=tickets&saved=1`);
+  });
+
+  app.post('/dashboard/:guildId/support', async (req, res) => {
+    if (!req.session.user) return res.redirect('/login');
+    const { discordUrl, instagramUrl, twitterUrl } = req.body;
+    await updateSettings(req.params.guildId, {
+      support: { discordUrl: discordUrl || '', instagramUrl: instagramUrl || '', twitterUrl: twitterUrl || '' },
+    });
+    res.redirect(`/dashboard/${req.params.guildId}?tab=support&saved=1`);
   });
 
   app.get('/logout', (req, res) => {
