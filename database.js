@@ -7,7 +7,7 @@ const guildSettingsSchema = new mongoose.Schema({
   botName: { type: String, default: 'Oscorp' },
   activity: { type: String, default: 'Playing' },
   welcomeChannel: { type: String, default: '' },
-  welcomeMessage: { type: String, default: 'أهلاً بك في السيرفر!' },
+  welcomeMessage: { type: String, default: 'Welcome to the server {user}!' },
   autoRole: { type: String, default: '' },
   autoModEnabled: { type: Boolean, default: false },
   ticketCategory: { type: String, default: '' }
@@ -18,9 +18,9 @@ const Settings = mongoose.model('GuildSettings', guildSettingsSchema);
 async function connect() {
   try {
     await mongoose.connect(config.mongoUri);
-    console.log('✅ تم الاتصال بقاعدة البيانات MongoDB بنجاح!');
+    console.log('✅ Connected to MongoDB successfully!');
   } catch (error) {
-    console.error('❌ خطأ في الاتصال بقاعدة البيانات:', error);
+    console.error('❌ MongoDB Connection Error:', error);
   }
 }
 

@@ -28,7 +28,7 @@ app.get('/dashboard', (req, res) => {
   res.render('dashboard-select', { user: req.user });
 });
 
-// عرض إعدادات السيرفر
+// عرض إعدادات السيرفر المحددة
 app.get('/dashboard/:guildID', async (req, res) => {
   try {
     if (!req.isAuthenticated()) return res.redirect('/login');
@@ -49,30 +49,12 @@ app.get('/dashboard/:guildID', async (req, res) => {
       settings: settings
     });
   } catch (error) {
-    console.error('❌ Dashboard GET Error:', error);
-    res.status(500).send('حدث خطأ أثناء تحميل بيانات الداشبورد.');
+    console.error('❌ Dashboard Error:', error);
+    res.status(500).send('Error loading dashboard.');
   }
 });
 
-// حفظ إعدادات العامة (Settings)
-app.post('/dashboard/:guildID/settings', async (req, res) => {
-  try {
-    if (!req.isAuthenticated()) return res.redirect('/login');
-    const { prefix, botName, activity } = req.body;
-    
-    await Settings.findOneAndUpdate(
-      { guildId: req.params.guildID },
-      { prefix, botName, activity },
-      { upsert: true }
-    );
-    res.redirect(`/dashboard/${req.params.guildID}?success=true`);
-  } catch (error) {
-    console.error('❌ Settings POST Error:', error);
-    res.status(500).send('حدث خطأ أثناء حفظ الإعدادات.');
-  }
-});
-
-// حفظ إعدادات الترحيب (Welcome)
+// حفظ إعدادات الترحيب من الداشبورد
 app.post('/dashboard/:guildID/welcome', async (req, res) => {
   try {
     if (!req.isAuthenticated()) return res.redirect('/login');
@@ -85,12 +67,12 @@ app.post('/dashboard/:guildID/welcome', async (req, res) => {
     );
     res.redirect(`/dashboard/${req.params.guildID}?success=true`);
   } catch (error) {
-    console.error('❌ Welcome POST Error:', error);
-    res.status(500).send('حدث خطأ أثناء حفظ إعدادات الترحيب.');
+    console.error('❌ Welcome Save Error:', error);
+    res.status(500).send('Error saving welcome settings.');
   }
 });
 
-// حفظ إعدادات الحماية (AutoMod / Moderation)
+// حفظ إعدادات AutoMod من الداشبورد
 app.post('/dashboard/:guildID/automod', async (req, res) => {
   try {
     if (!req.isAuthenticated()) return res.redirect('/login');
@@ -98,13 +80,31 @@ app.post('/dashboard/:guildID/automod', async (req, res) => {
 
     await Settings.findOneAndUpdate(
       { guildId: req.params.guildID },
-      { autoModEnabled: autoModEnabled === 'on' },
+      { autoModEnabled: autoModEnabled === 'on' || autoModEnabled === true },
       { upsert: true }
     );
     res.redirect(`/dashboard/${req.params.guildID}?success=true`);
   } catch (error) {
-    console.error('❌ AutoMod POST Error:', error);
-    res.status(500).send('حدث خطأ أثناء حفظ إعدادات الحماية.');
+    console.error('❌ AutoMod Save Error:', error);
+    res.status(500).send('Error saving AutoMod settings.');
+  }
+});
+
+// حفظ إعدادات التذاكر من الداشبورد
+app.post('/dashboard/:guildID/tickets', async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) return res.redirect('/login');
+    const { ticketCategory } = req.body;
+
+    await Settings.findOneAndUpdate(
+      { guildId: req.params.guildID },
+      { ticketCategory },
+      { upsert: true }
+    );
+    res.redirect(`/dashboard/${req.params.guildID}?success=true`);
+  } catch (error) {
+    console.error('❌ Ticket Save Error:', error);
+    res.status(500).send('Error saving Ticket settings.');
   }
 });
 
