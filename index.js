@@ -22,39 +22,20 @@ client.once('ready', () => {
 });
 
 client.on('interactionCreate', async (interaction) => {
-  // Autocomplete لإظهار اسم الكوماند المتاح فوراً عند كتابة /help command:
-  if (interaction.isAutocomplete()) {
-    if (interaction.commandName === 'help') {
-      const focusedValue = interaction.options.getFocused().toLowerCase();
-      const availableCommands = [
-        'ban', 'unban', 'kick', 'timeout', 'untimeout', 'warn', 'clear', 
-        'lock', 'unlock', 'hide', 'unhide', 'slowmode', 'vkick', 'vmove', 
-        'vmute', 'vunmute', 'vdeaf', 'vundeaf', 'role-add', 'role-remove', 'user'
-      ];
+  if (!interaction.isChatInputCommand()) return;
 
-      const filtered = availableCommands.filter(choice => choice.toLowerCase().includes(focusedValue)).slice(0, 25);
-      await interaction.respond(
-        filtered.map(choice => ({ name: choice, value: choice }))
-      ).catch(() => null);
-    }
-    return;
-  }
+  const command = client.commands.get(interaction.commandName);
+  if (!command) return;
 
-  // تنفيذ الأوامر (Slash Commands)
-  if (interaction.isChatInputCommand()) {
-    const command = client.commands.get(interaction.commandName);
-    if (!command) return;
-
-    try {
-      await command.execute(interaction);
-    } catch (error) {
-      console.error(error);
-      const replyOptions = { content: '❌ حدث خطأ أثناء تنفيذ هذا الأمر!', ephemeral: true };
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp(replyOptions).catch(() => null);
-      } else {
-        await interaction.reply(replyOptions).catch(() => null);
-      }
+  try {
+    await command.execute(interaction);
+  } catch (error) {
+    console.error(error);
+    const replyOptions = { content: '❌ حدث خطأ أثناء تنفيذ هذا الأمر!', ephemeral: true };
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp(replyOptions).catch(() => null);
+    } else {
+      await interaction.reply(replyOptions).catch(() => null);
     }
   }
 });
