@@ -2,8 +2,6 @@ const {
   SlashCommandBuilder,
   PermissionFlagsBits,
   EmbedBuilder,
-  ActionRowBuilder,
-  StringSelectMenuBuilder,
   ChannelType
 } = require('discord.js');
 
@@ -13,30 +11,7 @@ function textReply(content, ephemeral = false) {
   return { content, ephemeral };
 }
 
-function validImageUrl(value) {
-  if (!value) return null;
-  try {
-    const url = new URL(value.trim());
-    if (!['http:', 'https:'].includes(url.protocol)) return null;
-    return url.toString();
-  } catch {
-    return null;
-  }
-}
-
-function parseDuration(input) {
-  if (!input) return null;
-  const match = String(input).trim().match(/^(\d+)(s|m|h|d)$/i);
-  if (!match) return null;
-  const value = Number(match[1]);
-  const unit = match[2].toLowerCase();
-  const multipliers = { s: 1000, m: 60 * 1000, h: 60 * 60 * 1000, d: 24 * 60 * 60 * 1000 };
-  const duration = value * multipliers[unit];
-  if (!Number.isSafeInteger(duration) || duration <= 0) return null;
-  return duration;
-}
-
-// Database of Help Information for Moderation & General Commands
+// قاعدة بيانات شروحات الأوامر بنفس تنسيق ProBot
 const COMMANDS_HELP_DATA = {
   ban: {
     description: 'Bans a member from the server.',
@@ -174,48 +149,27 @@ module.exports = {
 
   commands: [
 
-    // 1. HELP COMMAND (ProBot Style Documentation)
+    // 1. HELP COMMAND (ProBot Style: Feeling lost?)
     {
       data: new SlashCommandBuilder()
         .setName('help')
-        .setDescription('Shows details about how to use a command.')
+        .setDescription('Feeling lost?')
         .addStringOption(opt =>
           opt
             .setName('command')
-            .setDescription('The command you want information about')
+            .setDescription('Shows details about how to use a command.')
             .setRequired(false)
-            .addChoices(
-              { name: 'ban', value: 'ban' },
-              { name: 'unban', value: 'unban' },
-              { name: 'kick', value: 'kick' },
-              { name: 'timeout', value: 'timeout' },
-              { name: 'untimeout', value: 'untimeout' },
-              { name: 'warn', value: 'warn' },
-              { name: 'clear', value: 'clear' },
-              { name: 'lock', value: 'lock' },
-              { name: 'unlock', value: 'unlock' },
-              { name: 'hide', value: 'hide' },
-              { name: 'unhide', value: 'unhide' },
-              { name: 'slowmode', value: 'slowmode' },
-              { name: 'vkick', value: 'vkick' },
-              { name: 'vmove', value: 'vmove' },
-              { name: 'vmute', value: 'vmute' },
-              { name: 'vunmute', value: 'vunmute' },
-              { name: 'vdeaf', value: 'vdeaf' },
-              { name: 'vundeaf', value: 'vundeaf' },
-              { name: 'role-add', value: 'role-add' },
-              { name: 'role-remove', value: 'role-remove' },
-              { name: 'user', value: 'user' }
-            )
+            .setAutocomplete(true)
         ),
 
       async execute(interaction) {
         const cmdName = interaction.options.getString('command');
 
+        // إذا أرسل المستخدم /help بدون تحديد أمر
         if (!cmdName) {
           const listEmbed = new EmbedBuilder()
-            .setTitle('📖 Oscorp Moderation Commands Help')
-            .setDescription('للحصول على شرح تفصيلي وطريقة استخدام أمر معين، اكتب:\n`/help command:اسم_الأمر`')
+            .setTitle('📖 Oscorp Control Systems - Help')
+            .setDescription('للحصول على شرح تفصيلي لأي أمر، اكتب:\n`/help command:اسم_الأمر`')
             .addFields({
               name: '🛠️ Available Commands',
               value: '`ban`, `unban`, `kick`, `timeout`, `untimeout`, `warn`, `clear`, `lock`, `unlock`, `hide`, `unhide`, `slowmode`, `vkick`, `vmove`, `vmute`, `vunmute`, `vdeaf`, `vundeaf`, `role-add`, `role-remove`, `user`'
@@ -226,14 +180,16 @@ module.exports = {
           return interaction.reply({ embeds: [listEmbed], ephemeral: true });
         }
 
-        const data = COMMANDS_HELP_DATA[cmdName];
+        const cleanCmdName = cmdName.toLowerCase().replace('/', '').trim();
+        const data = COMMANDS_HELP_DATA[cleanCmdName];
 
         if (!data) {
-          return interaction.reply(textReply('❌ Command not found in help database.', true));
+          return interaction.reply(textReply(`❌ Command \`${cleanCmdName}\` not found in help database.`, true));
         }
 
+        // عرض التفاصيل تماماً مثل ProBot
         const helpEmbed = new EmbedBuilder()
-          .setTitle(`Command: ${cmdName}`)
+          .setTitle(`Command: ${cleanCmdName}`)
           .setDescription(data.description)
           .addFields(
             { name: 'Usage:', value: `\`\`\`text\n${data.usage}\n\`\`\``, inline: false },
@@ -340,7 +296,7 @@ module.exports = {
 
         try {
           await member.kick(reason);
-          await interaction.reply(textReply(`👢 ${member.user.tag} has been kicked.`));
+          await interaction.reply(textReply(`` + member.user.tag + ` has been kicked.`));
         } catch {
           await interaction.reply(textReply('❌ I could not kick this member.', true));
         }
@@ -676,7 +632,7 @@ module.exports = {
       }
     },
 
-    // 22. USER PROFILE & ID
+    // 22. USER PROFILE
     {
       data: new SlashCommandBuilder()
         .setName('user')
