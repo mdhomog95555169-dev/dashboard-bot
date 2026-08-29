@@ -11,145 +11,12 @@ function textReply(content, ephemeral = false) {
   return { content, ephemeral };
 }
 
-// قاعدة بيانات شروحات الأوامر بنفس تنسيق ProBot
-const COMMANDS_HELP_DATA = {
-  ban: {
-    description: 'Bans a member from the server.',
-    usage: '/ban [user] (time m/h/d/mo/y) (reason)',
-    examples: [
-      '/ban @User',
-      '/ban @User spamming',
-      '/ban @User 1h spamming',
-      '/ban @User 1d spamming',
-      '/ban @User 1w'
-    ]
-  },
-  unban: {
-    description: 'Unbans a user using their Discord User ID.',
-    usage: '/unban [userid]',
-    examples: [
-      '/unban 123456789012345678'
-    ]
-  },
-  kick: {
-    description: 'Kicks a user from the server.',
-    usage: '/kick [user] (reason)',
-    examples: [
-      '/kick @User',
-      '/kick @User Breaking rules'
-    ]
-  },
-  timeout: {
-    description: 'Timeout a user from sending messages, react or join voice channels.',
-    usage: '/timeout [user] (duration_minutes) (reason)',
-    examples: [
-      '/timeout @User 10',
-      '/timeout @User 60 Spamming in channels'
-    ]
-  },
-  untimeout: {
-    description: 'Removes the active timeout/mute from a member.',
-    usage: '/untimeout [user]',
-    examples: [
-      '/untimeout @User'
-    ]
-  },
-  warn: {
-    description: 'Issues a formal warning to a user.',
-    usage: '/warn [user] [reason]',
-    examples: [
-      '/warn @User Inappropriate language'
-    ]
-  },
-  clear: {
-    description: 'Cleans and purges messages from a text channel.',
-    usage: '/clear [amount]',
-    examples: [
-      '/clear 10',
-      '/clear 100'
-    ]
-  },
-  lock: {
-    description: 'Locks the current text channel to prevent users from typing.',
-    usage: '/lock',
-    examples: ['/lock']
-  },
-  unlock: {
-    description: 'Unlocks the current text channel.',
-    usage: '/unlock',
-    examples: ['/unlock']
-  },
-  hide: {
-    description: 'Hides the channel from regular members.',
-    usage: '/hide',
-    examples: ['/hide']
-  },
-  unhide: {
-    description: 'Makes the channel visible to members again.',
-    usage: '/unhide',
-    examples: ['/unhide']
-  },
-  slowmode: {
-    description: 'Sets slowmode delay for members in the text channel.',
-    usage: '/slowmode [seconds]',
-    examples: [
-      '/slowmode 5',
-      '/slowmode 0'
-    ]
-  },
-  vkick: {
-    description: 'Disconnects a user from a voice channel.',
-    usage: '/vkick [user]',
-    examples: ['/vkick @User']
-  },
-  vmove: {
-    description: 'Moves a voice member to another voice channel.',
-    usage: '/vmove [user] [channel]',
-    examples: ['/vmove @User #GeneralVoice']
-  },
-  vmute: {
-    description: 'Mutes a member in voice channels.',
-    usage: '/vmute [user]',
-    examples: ['/vmute @User']
-  },
-  vunmute: {
-    description: 'Unmutes a member in voice channels.',
-    usage: '/vunmute [user]',
-    examples: ['/vunmute @User']
-  },
-  vdeaf: {
-    description: 'Deafens a member in voice channels.',
-    usage: '/vdeaf [user]',
-    examples: ['/vdeaf @User']
-  },
-  vundeaf: {
-    description: 'Undeafens a member in voice channels.',
-    usage: '/vundeaf [user]',
-    examples: ['/vundeaf @User']
-  },
-  'role-add': {
-    description: 'Assigns a specified role to a member.',
-    usage: '/role-add [user] [role]',
-    examples: ['/role-add @User @VIP']
-  },
-  'role-remove': {
-    description: 'Removes a specified role from a member.',
-    usage: '/role-remove [user] [role]',
-    examples: ['/role-remove @User @VIP']
-  },
-  user: {
-    description: 'Displays detailed user profile information and ID.',
-    usage: '/user (target)',
-    examples: ['/user', '/user @User']
-  }
-};
-
 module.exports = {
   DEFAULT_TICKET_CATEGORY_ID,
 
   commands: [
 
-    // 1. HELP COMMAND (Feeling lost? + Option command)
+    // 1. HELP COMMAND (Feeling lost? + Single Gray Embed + No DMs)
     {
       data: new SlashCommandBuilder()
         .setName('help')
@@ -157,48 +24,25 @@ module.exports = {
         .addStringOption(opt =>
           opt
             .setName('command')
-            .setDescription('Show details about a specific command.')
+            .setDescription('Shows details about how to use a command.')
             .setRequired(false)
-            .setAutocomplete(true)
         ),
 
       async execute(interaction) {
-        const cmdName = interaction.options.getString('command');
-
-        // في حال تم كتابة الأمر بدون اختيار اسم أمر معين
-        if (!cmdName) {
-          const listEmbed = new EmbedBuilder()
-            .setTitle('📖 Oscorp Control Systems - Help')
-            .setDescription('للحصول على شرح تفصيلي لأي أمر، اكتب:\n`/help command:اسم_الأمر`')
-            .addFields({
-              name: '🛠️ Available Commands',
-              value: '`ban`, `unban`, `kick`, `timeout`, `untimeout`, `warn`, `clear`, `lock`, `unlock`, `hide`, `unhide`, `slowmode`, `vkick`, `vmove`, `vmute`, `vunmute`, `vdeaf`, `vundeaf`, `role-add`, `role-remove`, `user`'
-            })
-            .setColor('#2b2d31') // شريط لون رصاصي
-            .setFooter({ text: 'Oscorp Control Systems' });
-
-          return interaction.reply({ embeds: [listEmbed], ephemeral: true });
-        }
-
-        const cleanCmdName = cmdName.toLowerCase().replace('/', '').trim();
-        const data = COMMANDS_HELP_DATA[cleanCmdName];
-
-        if (!data) {
-          return interaction.reply(textReply(`❌ Command \`${cleanCmdName}\` not found in help database.`, true));
-        }
-
-        // إمبد رصاصي تفصيلي للأمر بنفس أسلوب ProBot
-        const helpEmbed = new EmbedBuilder()
-          .setTitle(`Command: ${cleanCmdName}`)
-          .setDescription(data.description)
-          .addFields(
-            { name: 'Usage:', value: `\`\`\`text\n${data.usage}\n\`\`\``, inline: false },
-            { name: 'Examples:', value: `\`\`\`text\n${data.examples.join('\n')}\n\`\`\``, inline: false }
+        // إمبد واحد رصاصي بسيط وواضح في نفس الشات
+        const mainEmbed = new EmbedBuilder()
+          .setColor('#2b2d31')
+          .setTitle('📖 Oscorp Control Systems - Help')
+          .setDescription(
+            '**Available Commands:**\n`ban`, `unban`, `kick`, `timeout`, `untimeout`, `warn`, `clear`, `lock`, `unlock`, `hide`, `unhide`, `slowmode`, `vkick`, `vmove`, `vmute`, `vunmute`, `vdeaf`, `vundeaf`, `role-add`, `role-remove`, `user`'
           )
-          .setColor('#2b2d31') // شريط لون رصاصي
           .setFooter({ text: 'Oscorp Control Systems' });
 
-        await interaction.reply({ embeds: [helpEmbed], ephemeral: true });
+        // ephemeral: true يضمن ظهور الرد في نفس الشات لك فقط وبدون DMs نهائياً
+        return interaction.reply({
+          embeds: [mainEmbed],
+          ephemeral: true
+        });
       }
     },
 
