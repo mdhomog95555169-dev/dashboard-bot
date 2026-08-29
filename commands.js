@@ -15,14 +15,9 @@ function textReply(content, ephemeral = false) {
 
 function validImageUrl(value) {
   if (!value) return null;
-
   try {
     const url = new URL(value.trim());
-
-    if (!['http:', 'https:'].includes(url.protocol)) {
-      return null;
-    }
-
+    if (!['http:', 'https:'].includes(url.protocol)) return null;
     return url.toString();
   } catch {
     return null;
@@ -31,234 +26,223 @@ function validImageUrl(value) {
 
 function parseDuration(input) {
   if (!input) return null;
-
   const match = String(input).trim().match(/^(\d+)(s|m|h|d)$/i);
-
   if (!match) return null;
-
   const value = Number(match[1]);
   const unit = match[2].toLowerCase();
-
-  const multipliers = {
-    s: 1000,
-    m: 60 * 1000,
-    h: 60 * 60 * 1000,
-    d: 24 * 60 * 60 * 1000
-  };
-
+  const multipliers = { s: 1000, m: 60 * 1000, h: 60 * 60 * 1000, d: 24 * 60 * 60 * 1000 };
   const duration = value * multipliers[unit];
-
-  if (!Number.isSafeInteger(duration) || duration <= 0) {
-    return null;
-  }
-
+  if (!Number.isSafeInteger(duration) || duration <= 0) return null;
   return duration;
 }
 
-const tempBanTimers = new Map();
-
-function scheduleTempUnban(guild, userId, duration) {
-  const key = `${guild.id}:${userId}`;
-
-  if (tempBanTimers.has(key)) {
-    clearTimeout(tempBanTimers.get(key));
+// Database of Help Information for Moderation & General Commands
+const COMMANDS_HELP_DATA = {
+  ban: {
+    description: 'Bans a member from the server.',
+    usage: '/ban [user] (time m/h/d/mo/y) (reason)',
+    examples: [
+      '/ban @User',
+      '/ban @User spamming',
+      '/ban @User 1h spamming',
+      '/ban @User 1d spamming',
+      '/ban @User 1w'
+    ]
+  },
+  unban: {
+    description: 'Unbans a user using their Discord User ID.',
+    usage: '/unban [userid]',
+    examples: [
+      '/unban 123456789012345678'
+    ]
+  },
+  kick: {
+    description: 'Kicks a user from the server.',
+    usage: '/kick [user] (reason)',
+    examples: [
+      '/kick @User',
+      '/kick @User Breaking rules'
+    ]
+  },
+  timeout: {
+    description: 'Timeout a user from sending messages, react or join voice channels.',
+    usage: '/timeout [user] (duration_minutes) (reason)',
+    examples: [
+      '/timeout @User 10',
+      '/timeout @User 60 Spamming in channels'
+    ]
+  },
+  untimeout: {
+    description: 'Removes the active timeout/mute from a member.',
+    usage: '/untimeout [user]',
+    examples: [
+      '/untimeout @User'
+    ]
+  },
+  warn: {
+    description: 'Issues a formal warning to a user.',
+    usage: '/warn [user] [reason]',
+    examples: [
+      '/warn @User Inappropriate language'
+    ]
+  },
+  clear: {
+    description: 'Cleans and purges messages from a text channel.',
+    usage: '/clear [amount]',
+    examples: [
+      '/clear 10',
+      '/clear 100'
+    ]
+  },
+  lock: {
+    description: 'Locks the current text channel to prevent users from typing.',
+    usage: '/lock',
+    examples: ['/lock']
+  },
+  unlock: {
+    description: 'Unlocks the current text channel.',
+    usage: '/unlock',
+    examples: ['/unlock']
+  },
+  hide: {
+    description: 'Hides the channel from regular members.',
+    usage: '/hide',
+    examples: ['/hide']
+  },
+  unhide: {
+    description: 'Makes the channel visible to members again.',
+    usage: '/unhide',
+    examples: ['/unhide']
+  },
+  slowmode: {
+    description: 'Sets slowmode delay for members in the text channel.',
+    usage: '/slowmode [seconds]',
+    examples: [
+      '/slowmode 5',
+      '/slowmode 0'
+    ]
+  },
+  vkick: {
+    description: 'Disconnects a user from a voice channel.',
+    usage: '/vkick [user]',
+    examples: ['/vkick @User']
+  },
+  vmove: {
+    description: 'Moves a voice member to another voice channel.',
+    usage: '/vmove [user] [channel]',
+    examples: ['/vmove @User #GeneralVoice']
+  },
+  vmute: {
+    description: 'Mutes a member in voice channels.',
+    usage: '/vmute [user]',
+    examples: ['/vmute @User']
+  },
+  vunmute: {
+    description: 'Unmutes a member in voice channels.',
+    usage: '/vunmute [user]',
+    examples: ['/vunmute @User']
+  },
+  vdeaf: {
+    description: 'Deafens a member in voice channels.',
+    usage: '/vdeaf [user]',
+    examples: ['/vdeaf @User']
+  },
+  vundeaf: {
+    description: 'Undeafens a member in voice channels.',
+    usage: '/vundeaf [user]',
+    examples: ['/vundeaf @User']
+  },
+  'role-add': {
+    description: 'Assigns a specified role to a member.',
+    usage: '/role-add [user] [role]',
+    examples: ['/role-add @User @VIP']
+  },
+  'role-remove': {
+    description: 'Removes a specified role from a member.',
+    usage: '/role-remove [user] [role]',
+    examples: ['/role-remove @User @VIP']
+  },
+  user: {
+    description: 'Displays detailed user profile information and ID.',
+    usage: '/user (target)',
+    examples: ['/user', '/user @User']
   }
-
-  const timer = setTimeout(async () => {
-    try {
-      await guild.bans.remove(userId, 'Temporary ban expired');
-    } catch (error) {
-      console.error(`Failed to unban ${userId}:`, error.message);
-    }
-
-    tempBanTimers.delete(key);
-  }, duration);
-
-  tempBanTimers.set(key, timer);
-}
+};
 
 module.exports = {
   DEFAULT_TICKET_CATEGORY_ID,
 
   commands: [
 
-    // 1. TICKET SETUP
+    // 1. HELP COMMAND (ProBot Style Documentation)
     {
       data: new SlashCommandBuilder()
-        .setName('ticket-setup')
-        .setDescription('Create a customized support ticket panel')
+        .setName('help')
+        .setDescription('Shows details about how to use a command.')
         .addStringOption(opt =>
           opt
-            .setName('title')
-            .setDescription('Embed Title')
-            .setRequired(true)
-        )
-        .addStringOption(opt =>
-          opt
-            .setName('description')
-            .setDescription('Embed Description')
-            .setRequired(true)
-        )
-        .addStringOption(opt =>
-          opt
-            .setName('cat1_label')
-            .setDescription('Category 1 Name')
-            .setRequired(true)
-        )
-        .addChannelOption(opt =>
-          opt
-            .setName('ticket_category')
-            .setDescription('Category Channel for tickets')
-            .addChannelTypes(ChannelType.GuildCategory)
+            .setName('command')
+            .setDescription('The command you want information about')
             .setRequired(false)
-        )
-        .addStringOption(opt =>
-          opt
-            .setName('icon_url')
-            .setDescription('Thumbnail image URL')
-            .setRequired(false)
-        )
-        .addStringOption(opt =>
-          opt
-            .setName('banner_url')
-            .setDescription('Banner image URL')
-            .setRequired(false)
-        )
-        .addStringOption(opt =>
-          opt
-            .setName('cat1_emoji')
-            .setDescription('Category 1 Emoji')
-            .setRequired(false)
-        )
-        .addStringOption(opt =>
-          opt
-            .setName('cat2_label')
-            .setDescription('Category 2 Name')
-            .setRequired(false)
-        )
-        .addStringOption(opt =>
-          opt
-            .setName('cat2_emoji')
-            .setDescription('Category 2 Emoji')
-            .setRequired(false)
-        )
-        .addStringOption(opt =>
-          opt
-            .setName('cat3_label')
-            .setDescription('Category 3 Name')
-            .setRequired(false)
-        )
-        .addStringOption(opt =>
-          opt
-            .setName('cat3_emoji')
-            .setDescription('Category 3 Emoji')
-            .setRequired(false)
-        )
-        .addStringOption(opt =>
-          opt
-            .setName('cat4_label')
-            .setDescription('Category 4 Name')
-            .setRequired(false)
-        )
-        .addStringOption(opt =>
-          opt
-            .setName('cat4_emoji')
-            .setDescription('Category 4 Emoji')
-            .setRequired(false)
-        )
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+            .addChoices(
+              { name: 'ban', value: 'ban' },
+              { name: 'unban', value: 'unban' },
+              { name: 'kick', value: 'kick' },
+              { name: 'timeout', value: 'timeout' },
+              { name: 'untimeout', value: 'untimeout' },
+              { name: 'warn', value: 'warn' },
+              { name: 'clear', value: 'clear' },
+              { name: 'lock', value: 'lock' },
+              { name: 'unlock', value: 'unlock' },
+              { name: 'hide', value: 'hide' },
+              { name: 'unhide', value: 'unhide' },
+              { name: 'slowmode', value: 'slowmode' },
+              { name: 'vkick', value: 'vkick' },
+              { name: 'vmove', value: 'vmove' },
+              { name: 'vmute', value: 'vmute' },
+              { name: 'vunmute', value: 'vunmute' },
+              { name: 'vdeaf', value: 'vdeaf' },
+              { name: 'vundeaf', value: 'vundeaf' },
+              { name: 'role-add', value: 'role-add' },
+              { name: 'role-remove', value: 'role-remove' },
+              { name: 'user', value: 'user' }
+            )
+        ),
 
       async execute(interaction) {
-        const title = interaction.options.getString('title');
-        const description = interaction.options.getString('description');
-        const selectedCategory =
-          interaction.options.getChannel('ticket_category');
+        const cmdName = interaction.options.getString('command');
 
-        const categoryId =
-          selectedCategory?.id || DEFAULT_TICKET_CATEGORY_ID;
+        if (!cmdName) {
+          const listEmbed = new EmbedBuilder()
+            .setTitle('📖 Oscorp Moderation Commands Help')
+            .setDescription('للحصول على شرح تفصيلي وطريقة استخدام أمر معين، اكتب:\n`/help command:اسم_الأمر`')
+            .addFields({
+              name: '🛠️ Available Commands',
+              value: '`ban`, `unban`, `kick`, `timeout`, `untimeout`, `warn`, `clear`, `lock`, `unlock`, `hide`, `unhide`, `slowmode`, `vkick`, `vmove`, `vmute`, `vunmute`, `vdeaf`, `vundeaf`, `role-add`, `role-remove`, `user`'
+            })
+            .setColor('#2f3136')
+            .setFooter({ text: 'Oscorp Control Systems' });
 
-        const rawIconUrl =
-          interaction.options.getString('icon_url');
-
-        const rawBannerUrl =
-          interaction.options.getString('banner_url');
-
-        const iconUrl = validImageUrl(rawIconUrl);
-        const bannerUrl = validImageUrl(rawBannerUrl);
-
-        if (rawIconUrl && !iconUrl) {
-          return interaction.reply(
-            textReply(
-              '❌ Invalid icon URL. Please provide a valid HTTP/HTTPS image URL.',
-              true
-            )
-          );
+          return interaction.reply({ embeds: [listEmbed], ephemeral: true });
         }
 
-        if (rawBannerUrl && !bannerUrl) {
-          return interaction.reply(
-            textReply(
-              '❌ Invalid banner URL. Please provide a valid HTTP/HTTPS image URL.',
-              true
-            )
-          );
+        const data = COMMANDS_HELP_DATA[cmdName];
+
+        if (!data) {
+          return interaction.reply(textReply('❌ Command not found in help database.', true));
         }
 
-        const options = [];
-
-        for (let i = 1; i <= 4; i++) {
-          const label = interaction.options.getString(`cat${i}_label`);
-          const emoji = interaction.options.getString(`cat${i}_emoji`);
-
-          if (!label) continue;
-
-          const option = {
-            label: label.slice(0, 100),
-            value: `cat_${i}_${categoryId}`
-          };
-
-          if (emoji) {
-            option.emoji = emoji;
-          }
-
-          options.push(option);
-        }
-
-        if (!options.length) {
-          return interaction.reply(
-            textReply('❌ You must configure at least one ticket category.', true)
-          );
-        }
-
-        const ticketEmbed = new EmbedBuilder()
-          .setTitle(title)
-          .setDescription(description)
+        const helpEmbed = new EmbedBuilder()
+          .setTitle(`Command: ${cmdName}`)
+          .setDescription(data.description)
+          .addFields(
+            { name: 'Usage:', value: `\`\`\`text\n${data.usage}\n\`\`\``, inline: false },
+            { name: 'Examples:', value: `\`\`\`text\n${data.examples.join('\n')}\n\`\`\``, inline: false }
+          )
           .setColor('#2f3136')
-          .setTimestamp();
+          .setFooter({ text: 'Oscorp Control Systems' });
 
-        if (iconUrl) {
-          ticketEmbed.setThumbnail(iconUrl);
-        }
-
-        if (bannerUrl) {
-          ticketEmbed.setImage(bannerUrl);
-        }
-
-        const selectMenu = new ActionRowBuilder().addComponents(
-          new StringSelectMenuBuilder()
-            .setCustomId('custom_ticket_select')
-            .setPlaceholder('اختر قسم التذكرة...')
-            .addOptions(options)
-        );
-
-        await interaction.channel.send({
-          embeds: [ticketEmbed],
-          components: [selectMenu]
-        });
-
-        await interaction.reply(
-          textReply('🎫 Ticket panel has been created successfully!', true)
-        );
+        await interaction.reply({ embeds: [helpEmbed], ephemeral: true });
       }
     },
 
@@ -279,30 +263,14 @@ module.exports = {
 
       async execute(interaction) {
         const amount = interaction.options.getInteger('amount');
-
-        if (amount < 1 || amount > 100) {
-          return interaction.reply(
-            textReply('❌ Amount must be between 1 and 100.', true)
-          );
-        }
-
-        const deleted = await interaction.channel
-          .bulkDelete(amount, true)
-          .catch(() => null);
+        const deleted = await interaction.channel.bulkDelete(amount, true).catch(() => null);
 
         if (!deleted) {
-          return interaction.reply(
-            textReply('❌ I could not delete the messages.', true)
-          );
+          return interaction.reply(textReply('❌ I could not delete the messages.', true));
         }
 
-        await interaction.reply({
-          content: `\`\`\`\n${deleted.size} messages have been deleted.\n\`\`\``
-        });
-
-        setTimeout(() => {
-          interaction.deleteReply().catch(() => null);
-        }, 3000);
+        await interaction.reply({ content: `\`\`\`\n${deleted.size} messages have been deleted.\n\`\`\`` });
+        setTimeout(() => interaction.deleteReply().catch(() => null), 3000);
       }
     },
 
@@ -311,107 +279,26 @@ module.exports = {
       data: new SlashCommandBuilder()
         .setName('ban')
         .setDescription('Ban User from the server')
-        .addUserOption(opt =>
-          opt
-            .setName('user')
-            .setDescription('Target user')
-            .setRequired(true)
-        )
-        .addStringOption(opt =>
-          opt
-            .setName('time')
-            .setDescription('Temporary ban: 30m, 2h, 1d')
-            .setRequired(false)
-        )
-        .addStringOption(opt =>
-          opt
-            .setName('reason')
-            .setDescription('Reason for the ban')
-            .setRequired(false)
-        )
-        .addIntegerOption(opt =>
-          opt
-            .setName('bulk')
-            .setDescription('Delete messages from the last 0-7 days')
-            .setMinValue(0)
-            .setMaxValue(7)
-            .setRequired(false)
-        )
+        .addUserOption(opt => opt.setName('user').setDescription('Target user').setRequired(true))
+        .addStringOption(opt => opt.setName('time').setDescription('Temporary ban: 30m, 2h, 1d').setRequired(false))
+        .addStringOption(opt => opt.setName('reason').setDescription('Reason for the ban').setRequired(false))
         .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
 
       async execute(interaction) {
         const user = interaction.options.getUser('user');
-        const reason =
-          interaction.options.getString('reason') ||
-          'No reason provided';
+        const reason = interaction.options.getString('reason') || 'No reason provided';
+        const member = await interaction.guild.members.fetch(user.id).catch(() => null);
 
-        const time =
-          interaction.options.getString('time');
-
-        const bulk =
-          interaction.options.getInteger('bulk') || 0;
-
-        const member =
-          await interaction.guild.members
-            .fetch(user.id)
-            .catch(() => null);
-
-        if (
-          member &&
-          !member.bannable
-        ) {
-          return interaction.reply(
-            textReply(
-              '❌ I cannot ban this member because their role is higher than or equal to mine.',
-              true
-            )
-          );
-        }
-
-        let duration = null;
-
-        if (time) {
-          duration = parseDuration(time);
-
-          if (!duration) {
-            return interaction.reply(
-              textReply(
-                '❌ Invalid ban duration. Examples: `30m`, `2h`, `1d`.',
-                true
-              )
-            );
-          }
+        if (member && !member.bannable) {
+          return interaction.reply(textReply('❌ I cannot ban this member.', true));
         }
 
         try {
-          await interaction.guild.members.ban(user.id, {
-            reason,
-            deleteMessageSeconds: bulk * 86400
-          });
-        } catch (error) {
-          console.error('Ban error:', error);
-
-          return interaction.reply(
-            textReply('❌ I could not ban this user.', true)
-          );
+          await interaction.guild.members.ban(user.id, { reason });
+          await interaction.reply(textReply(`🔨 ${user.tag} has been banned.\n📝 Reason: ${reason}`));
+        } catch {
+          await interaction.reply(textReply('❌ I could not ban this user.', true));
         }
-
-        if (duration) {
-          scheduleTempUnban(
-            interaction.guild,
-            user.id,
-            duration
-          );
-        }
-
-        const durationText =
-          duration ? ` for ${time}` : '';
-
-        await interaction.reply(
-          textReply(
-            `🔨 ${user.tag} has been banned${durationText}.\n📝 Reason: ${reason}`
-          )
-        );
       }
     },
 
@@ -420,28 +307,16 @@ module.exports = {
       data: new SlashCommandBuilder()
         .setName('unban')
         .setDescription('Unban User by ID')
-        .addStringOption(opt =>
-          opt
-            .setName('userid')
-            .setDescription('User ID')
-            .setRequired(true)
-        )
+        .addStringOption(opt => opt.setName('userid').setDescription('User ID').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
 
       async execute(interaction) {
-        const userId =
-          interaction.options.getString('userid');
-
+        const userId = interaction.options.getString('userid');
         try {
           await interaction.guild.members.unban(userId);
-
-          await interaction.reply(
-            textReply(`🔓 User ${userId} has been unbanned.`)
-          );
+          await interaction.reply(textReply(`🔓 User ${userId} has been unbanned.`));
         } catch {
-          await interaction.reply(
-            textReply(`❌ User ${userId} is not banned.`, true)
-          );
+          await interaction.reply(textReply(`❌ User ${userId} is not banned.`, true));
         }
       }
     },
@@ -451,54 +326,24 @@ module.exports = {
       data: new SlashCommandBuilder()
         .setName('kick')
         .setDescription('Kick User')
-        .addUserOption(opt =>
-          opt
-            .setName('user')
-            .setDescription('Target user')
-            .setRequired(true)
-        )
-        .addStringOption(opt =>
-          opt
-            .setName('reason')
-            .setDescription('Reason')
-            .setRequired(false)
-        )
+        .addUserOption(opt => opt.setName('user').setDescription('Target user').setRequired(true))
+        .addStringOption(opt => opt.setName('reason').setDescription('Reason').setRequired(false))
         .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers),
 
       async execute(interaction) {
-        const member =
-          interaction.options.getMember('user');
+        const member = interaction.options.getMember('user');
+        const reason = interaction.options.getString('reason') || 'No reason provided';
 
-        const user =
-          interaction.options.getUser('user');
-
-        const reason =
-          interaction.options.getString('reason') ||
-          'No reason provided';
-
-        if (!member) {
-          return interaction.reply(
-            textReply('❌ Member not found.', true)
-          );
-        }
-
-        if (!member.kickable) {
-          return interaction.reply(
-            textReply('❌ I cannot kick this member.', true)
-          );
+        if (!member || !member.kickable) {
+          return interaction.reply(textReply('❌ I cannot kick this member.', true));
         }
 
         try {
           await member.kick(reason);
+          await interaction.reply(textReply(`👢 ${member.user.tag} has been kicked.`));
         } catch {
-          return interaction.reply(
-            textReply('❌ I could not kick this member.', true)
-          );
+          await interaction.reply(textReply('❌ I could not kick this member.', true));
         }
-
-        await interaction.reply(
-          textReply(`👢 ${user.tag} has been kicked.`)
-        );
       }
     },
 
@@ -507,67 +352,26 @@ module.exports = {
       data: new SlashCommandBuilder()
         .setName('timeout')
         .setDescription('Timeout/Mute Member')
-        .addUserOption(opt =>
-          opt
-            .setName('user')
-            .setDescription('Target user')
-            .setRequired(true)
-        )
-        .addIntegerOption(opt =>
-          opt
-            .setName('duration')
-            .setDescription('Duration in minutes')
-            .setMinValue(1)
-            .setMaxValue(40320)
-            .setRequired(true)
-        )
-        .addStringOption(opt =>
-          opt
-            .setName('reason')
-            .setDescription('Reason')
-            .setRequired(false)
-        )
+        .addUserOption(opt => opt.setName('user').setDescription('Target user').setRequired(true))
+        .addIntegerOption(opt => opt.setName('duration').setDescription('Duration in minutes').setMinValue(1).setRequired(true))
+        .addStringOption(opt => opt.setName('reason').setDescription('Reason').setRequired(false))
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
 
       async execute(interaction) {
-        const member =
-          interaction.options.getMember('user');
+        const member = interaction.options.getMember('user');
+        const duration = interaction.options.getInteger('duration');
+        const reason = interaction.options.getString('reason') || 'No reason provided';
 
-        const duration =
-          interaction.options.getInteger('duration');
-
-        const reason =
-          interaction.options.getString('reason') ||
-          'No reason provided';
-
-        if (!member) {
-          return interaction.reply(
-            textReply('❌ Member not found.', true)
-          );
-        }
-
-        if (!member.moderatable) {
-          return interaction.reply(
-            textReply('❌ I cannot timeout this member.', true)
-          );
+        if (!member || !member.moderatable) {
+          return interaction.reply(textReply('❌ I cannot timeout this member.', true));
         }
 
         try {
-          await member.timeout(
-            duration * 60000,
-            reason
-          );
+          await member.timeout(duration * 60000, reason);
+          await interaction.reply(textReply(`🔇 ${member.user.tag} has been timed out for ${duration} minutes.`));
         } catch {
-          return interaction.reply(
-            textReply('❌ I could not timeout this member.', true)
-          );
+          await interaction.reply(textReply('❌ I could not timeout this member.', true));
         }
-
-        await interaction.reply(
-          textReply(
-            `🔇 ${member.user.tag} has been timed out for ${duration} minutes.`
-          )
-        );
       }
     },
 
@@ -576,35 +380,19 @@ module.exports = {
       data: new SlashCommandBuilder()
         .setName('untimeout')
         .setDescription('Remove Timeout')
-        .addUserOption(opt =>
-          opt
-            .setName('user')
-            .setDescription('Target user')
-            .setRequired(true)
-        )
+        .addUserOption(opt => opt.setName('user').setDescription('Target user').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
 
       async execute(interaction) {
-        const member =
-          interaction.options.getMember('user');
-
-        if (!member) {
-          return interaction.reply(
-            textReply('❌ Member not found.', true)
-          );
-        }
+        const member = interaction.options.getMember('user');
+        if (!member) return interaction.reply(textReply('❌ Member not found.', true));
 
         try {
           await member.timeout(null);
+          await interaction.reply(textReply(`🔊 ${member.user.tag}'s timeout has been removed.`));
         } catch {
-          return interaction.reply(
-            textReply('❌ I could not remove the timeout.', true)
-          );
+          await interaction.reply(textReply('❌ I could not remove the timeout.', true));
         }
-
-        await interaction.reply(
-          textReply(`🔊 ${member.user.tag}'s timeout has been removed.`)
-        );
       }
     },
 
@@ -613,32 +401,14 @@ module.exports = {
       data: new SlashCommandBuilder()
         .setName('warn')
         .setDescription('Issue Warning')
-        .addUserOption(opt =>
-          opt
-            .setName('user')
-            .setDescription('Target user')
-            .setRequired(true)
-        )
-        .addStringOption(opt =>
-          opt
-            .setName('reason')
-            .setDescription('Reason')
-            .setRequired(true)
-        )
+        .addUserOption(opt => opt.setName('user').setDescription('Target user').setRequired(true))
+        .addStringOption(opt => opt.setName('reason').setDescription('Reason').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
       async execute(interaction) {
-        const user =
-          interaction.options.getUser('user');
-
-        const reason =
-          interaction.options.getString('reason');
-
-        await interaction.reply(
-          textReply(
-            `⚠️ ${user.tag} has been warned.\n📝 Reason: ${reason}`
-          )
-        );
+        const user = interaction.options.getUser('user');
+        const reason = interaction.options.getString('reason');
+        await interaction.reply(textReply(`⚠️ ${user.tag} has been warned.\n📝 Reason: ${reason}`));
       }
     },
 
@@ -651,19 +421,11 @@ module.exports = {
 
       async execute(interaction) {
         try {
-          await interaction.channel.permissionOverwrites.edit(
-            interaction.guild.roles.everyone,
-            { SendMessages: false }
-          );
+          await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { SendMessages: false });
+          await interaction.reply(textReply(`🔒 | ${interaction.channel} has been locked.`));
         } catch {
-          return interaction.reply(
-            textReply('❌ I could not lock this channel.', true)
-          );
+          await interaction.reply(textReply('❌ I could not lock this channel.', true));
         }
-
-        await interaction.reply(
-          textReply(`🔒 | ${interaction.channel} has been locked.`)
-        );
       }
     },
 
@@ -676,19 +438,11 @@ module.exports = {
 
       async execute(interaction) {
         try {
-          await interaction.channel.permissionOverwrites.edit(
-            interaction.guild.roles.everyone,
-            { SendMessages: true }
-          );
+          await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { SendMessages: true });
+          await interaction.reply(textReply(`🔓 | ${interaction.channel} has been unlocked.`));
         } catch {
-          return interaction.reply(
-            textReply('❌ I could not unlock this channel.', true)
-          );
+          await interaction.reply(textReply('❌ I could not unlock this channel.', true));
         }
-
-        await interaction.reply(
-          textReply(`🔓 | ${interaction.channel} has been unlocked.`)
-        );
       }
     },
 
@@ -701,19 +455,11 @@ module.exports = {
 
       async execute(interaction) {
         try {
-          await interaction.channel.permissionOverwrites.edit(
-            interaction.guild.roles.everyone,
-            { ViewChannel: false }
-          );
+          await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { ViewChannel: false });
+          await interaction.reply(textReply(`👁️‍🗨️ | ${interaction.channel} has been hidden.`));
         } catch {
-          return interaction.reply(
-            textReply('❌ I could not hide this channel.', true)
-          );
+          await interaction.reply(textReply('❌ I could not hide this channel.', true));
         }
-
-        await interaction.reply(
-          textReply(`👁️‍🗨️ | ${interaction.channel} has been hidden.`)
-        );
       }
     },
 
@@ -726,19 +472,11 @@ module.exports = {
 
       async execute(interaction) {
         try {
-          await interaction.channel.permissionOverwrites.edit(
-            interaction.guild.roles.everyone,
-            { ViewChannel: true }
-          );
+          await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { ViewChannel: true });
+          await interaction.reply(textReply(`👁️ | ${interaction.channel} is now visible.`));
         } catch {
-          return interaction.reply(
-            textReply('❌ I could not show this channel.', true)
-          );
+          await interaction.reply(textReply('❌ I could not show this channel.', true));
         }
-
-        await interaction.reply(
-          textReply(`👁️ | ${interaction.channel} is now visible.`)
-        );
       }
     },
 
@@ -747,39 +485,17 @@ module.exports = {
       data: new SlashCommandBuilder()
         .setName('slowmode')
         .setDescription('Set Slowmode Delay')
-        .addIntegerOption(opt =>
-          opt
-            .setName('seconds')
-            .setDescription('Seconds, 0-21600')
-            .setMinValue(0)
-            .setMaxValue(21600)
-            .setRequired(true)
-        )
+        .addIntegerOption(opt => opt.setName('seconds').setDescription('Seconds, 0-21600').setMinValue(0).setMaxValue(21600).setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
 
       async execute(interaction) {
-        const seconds =
-          interaction.options.getInteger('seconds');
-
+        const seconds = interaction.options.getInteger('seconds');
         try {
           await interaction.channel.setRateLimitPerUser(seconds);
+          await interaction.reply(textReply(`🐢 Slowmode set to ${seconds} seconds in ${interaction.channel}.`));
         } catch {
-          return interaction.reply(
-            textReply('❌ I could not change slowmode.', true)
-          );
+          await interaction.reply(textReply('❌ I could not change slowmode.', true));
         }
-
-        if (seconds === 0) {
-          return interaction.reply(
-            textReply(`🐢 Slowmode disabled in ${interaction.channel}.`)
-          );
-        }
-
-        await interaction.reply(
-          textReply(
-            `🐢 Slowmode set to ${seconds} seconds in ${interaction.channel}.`
-          )
-        );
       }
     },
 
@@ -788,41 +504,19 @@ module.exports = {
       data: new SlashCommandBuilder()
         .setName('vkick')
         .setDescription('Kick from Voice')
-        .addUserOption(opt =>
-          opt
-            .setName('user')
-            .setDescription('Target user')
-            .setRequired(true)
-        )
+        .addUserOption(opt => opt.setName('user').setDescription('Target user').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.MoveMembers),
 
       async execute(interaction) {
-        const member =
-          interaction.options.getMember('user');
-
-        if (!member) {
-          return interaction.reply(
-            textReply('❌ Member not found.', true)
-          );
-        }
-
-        if (!member.voice.channel) {
-          return interaction.reply(
-            textReply('❌ This member is not in a voice channel.', true)
-          );
-        }
+        const member = interaction.options.getMember('user');
+        if (!member || !member.voice.channel) return interaction.reply(textReply('❌ Member not in voice.', true));
 
         try {
           await member.voice.disconnect('Voice kick');
+          await interaction.reply(textReply(`🎙️ ${member.user.tag} disconnected from voice.`));
         } catch {
-          return interaction.reply(
-            textReply('❌ I could not disconnect this member.', true)
-          );
+          await interaction.reply(textReply('❌ Could not disconnect member.', true));
         }
-
-        await interaction.reply(
-          textReply(`🎙️ ${member.user.tag} has been disconnected from voice.`)
-        );
       }
     },
 
@@ -831,51 +525,22 @@ module.exports = {
       data: new SlashCommandBuilder()
         .setName('vmove')
         .setDescription('Move Voice Member')
-        .addUserOption(opt =>
-          opt
-            .setName('user')
-            .setDescription('Target user')
-            .setRequired(true)
-        )
-        .addChannelOption(opt =>
-          opt
-            .setName('channel')
-            .setDescription('Voice channel')
-            .addChannelTypes(ChannelType.GuildVoice, ChannelType.GuildStageVoice)
-            .setRequired(true)
-        )
+        .addUserOption(opt => opt.setName('user').setDescription('Target user').setRequired(true))
+        .addChannelOption(opt => opt.setName('channel').setDescription('Voice channel').addChannelTypes(ChannelType.GuildVoice).setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.MoveMembers),
 
       async execute(interaction) {
-        const member =
-          interaction.options.getMember('user');
+        const member = interaction.options.getMember('user');
+        const channel = interaction.options.getChannel('channel');
 
-        const channel =
-          interaction.options.getChannel('channel');
-
-        if (!member) {
-          return interaction.reply(
-            textReply('❌ Member not found.', true)
-          );
-        }
-
-        if (!member.voice.channel) {
-          return interaction.reply(
-            textReply('❌ This member is not in a voice channel.', true)
-          );
-        }
+        if (!member || !member.voice.channel) return interaction.reply(textReply('❌ Member not in voice.', true));
 
         try {
           await member.voice.setChannel(channel);
+          await interaction.reply(textReply(`↗️ ${member.user.tag} moved to ${channel.name}.`));
         } catch {
-          return interaction.reply(
-            textReply('❌ I could not move this member.', true)
-          );
+          await interaction.reply(textReply('❌ Could not move member.', true));
         }
-
-        await interaction.reply(
-          textReply(`↗️ ${member.user.tag} has been moved to ${channel.name}.`)
-        );
       }
     },
 
@@ -884,41 +549,19 @@ module.exports = {
       data: new SlashCommandBuilder()
         .setName('vmute')
         .setDescription('Mute in Voice')
-        .addUserOption(opt =>
-          opt
-            .setName('user')
-            .setDescription('Target user')
-            .setRequired(true)
-        )
+        .addUserOption(opt => opt.setName('user').setDescription('Target user').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.MuteMembers),
 
       async execute(interaction) {
-        const member =
-          interaction.options.getMember('user');
-
-        if (!member) {
-          return interaction.reply(
-            textReply('❌ Member not found.', true)
-          );
-        }
-
-        if (!member.voice.channel) {
-          return interaction.reply(
-            textReply('❌ This member is not in a voice channel.', true)
-          );
-        }
+        const member = interaction.options.getMember('user');
+        if (!member || !member.voice.channel) return interaction.reply(textReply('❌ Member not in voice.', true));
 
         try {
           await member.voice.setMute(true);
+          await interaction.reply(textReply(`🎙️ ${member.user.tag} voice muted.`));
         } catch {
-          return interaction.reply(
-            textReply('❌ I could not mute this member.', true)
-          );
+          await interaction.reply(textReply('❌ Could not voice mute member.', true));
         }
-
-        await interaction.reply(
-          textReply(`🎙️ ${member.user.tag} has been voice muted.`)
-        );
       }
     },
 
@@ -927,35 +570,19 @@ module.exports = {
       data: new SlashCommandBuilder()
         .setName('vunmute')
         .setDescription('Unmute in Voice')
-        .addUserOption(opt =>
-          opt
-            .setName('user')
-            .setDescription('Target user')
-            .setRequired(true)
-        )
+        .addUserOption(opt => opt.setName('user').setDescription('Target user').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.MuteMembers),
 
       async execute(interaction) {
-        const member =
-          interaction.options.getMember('user');
-
-        if (!member) {
-          return interaction.reply(
-            textReply('❌ Member not found.', true)
-          );
-        }
+        const member = interaction.options.getMember('user');
+        if (!member) return interaction.reply(textReply('❌ Member not found.', true));
 
         try {
           await member.voice.setMute(false);
+          await interaction.reply(textReply(`🔊 ${member.user.tag} voice unmuted.`));
         } catch {
-          return interaction.reply(
-            textReply('❌ I could not unmute this member.', true)
-          );
+          await interaction.reply(textReply('❌ Could not voice unmute member.', true));
         }
-
-        await interaction.reply(
-          textReply(`🔊 ${member.user.tag} has been voice unmuted.`)
-        );
       }
     },
 
@@ -964,41 +591,19 @@ module.exports = {
       data: new SlashCommandBuilder()
         .setName('vdeaf')
         .setDescription('Deafen in Voice')
-        .addUserOption(opt =>
-          opt
-            .setName('user')
-            .setDescription('Target user')
-            .setRequired(true)
-        )
+        .addUserOption(opt => opt.setName('user').setDescription('Target user').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.DeafenMembers),
 
       async execute(interaction) {
-        const member =
-          interaction.options.getMember('user');
-
-        if (!member) {
-          return interaction.reply(
-            textReply('❌ Member not found.', true)
-          );
-        }
-
-        if (!member.voice.channel) {
-          return interaction.reply(
-            textReply('❌ This member is not in a voice channel.', true)
-          );
-        }
+        const member = interaction.options.getMember('user');
+        if (!member || !member.voice.channel) return interaction.reply(textReply('❌ Member not in voice.', true));
 
         try {
           await member.voice.setDeaf(true);
+          await interaction.reply(textReply(`🎧 ${member.user.tag} deafened.`));
         } catch {
-          return interaction.reply(
-            textReply('❌ I could not deafen this member.', true)
-          );
+          await interaction.reply(textReply('❌ Could not deafen member.', true));
         }
-
-        await interaction.reply(
-          textReply(`🎧 ${member.user.tag} has been deafened.`)
-        );
       }
     },
 
@@ -1007,35 +612,19 @@ module.exports = {
       data: new SlashCommandBuilder()
         .setName('vundeaf')
         .setDescription('Undeafen in Voice')
-        .addUserOption(opt =>
-          opt
-            .setName('user')
-            .setDescription('Target user')
-            .setRequired(true)
-        )
+        .addUserOption(opt => opt.setName('user').setDescription('Target user').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.DeafenMembers),
 
       async execute(interaction) {
-        const member =
-          interaction.options.getMember('user');
-
-        if (!member) {
-          return interaction.reply(
-            textReply('❌ Member not found.', true)
-          );
-        }
+        const member = interaction.options.getMember('user');
+        if (!member) return interaction.reply(textReply('❌ Member not found.', true));
 
         try {
           await member.voice.setDeaf(false);
+          await interaction.reply(textReply(`🎧 ${member.user.tag} undeafened.`));
         } catch {
-          return interaction.reply(
-            textReply('❌ I could not undeafen this member.', true)
-          );
+          await interaction.reply(textReply('❌ Could not undeafen member.', true));
         }
-
-        await interaction.reply(
-          textReply(`🎧 ${member.user.tag} has been undeafened.`)
-        );
       }
     },
 
@@ -1044,56 +633,22 @@ module.exports = {
       data: new SlashCommandBuilder()
         .setName('role-add')
         .setDescription('Assign Role')
-        .addUserOption(opt =>
-          opt
-            .setName('user')
-            .setDescription('Target user')
-            .setRequired(true)
-        )
-        .addRoleOption(opt =>
-          opt
-            .setName('role')
-            .setDescription('Role')
-            .setRequired(true)
-        )
+        .addUserOption(opt => opt.setName('user').setDescription('Target user').setRequired(true))
+        .addRoleOption(opt => opt.setName('role').setDescription('Role').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles),
 
       async execute(interaction) {
-        const member =
-          interaction.options.getMember('user');
+        const member = interaction.options.getMember('user');
+        const role = interaction.options.getRole('role');
 
-        const role =
-          interaction.options.getRole('role');
-
-        if (!member) {
-          return interaction.reply(
-            textReply('❌ Member not found.', true)
-          );
-        }
-
-        if (!role) {
-          return interaction.reply(
-            textReply('❌ Role not found.', true)
-          );
-        }
-
-        if (!role.editable) {
-          return interaction.reply(
-            textReply('❌ I cannot manage this role.', true)
-          );
-        }
+        if (!member || !role) return interaction.reply(textReply('❌ Invalid user or role.', true));
 
         try {
           await member.roles.add(role);
+          await interaction.reply(textReply(`➕ Role ${role.name} assigned to ${member.user.tag}.`));
         } catch {
-          return interaction.reply(
-            textReply('❌ I could not add this role.', true)
-          );
+          await interaction.reply(textReply('❌ Could not add role.', true));
         }
-
-        await interaction.reply(
-          textReply(`➕ Role ${role.name} has been added to ${member.user.tag}.`)
-        );
       }
     },
 
@@ -1102,56 +657,22 @@ module.exports = {
       data: new SlashCommandBuilder()
         .setName('role-remove')
         .setDescription('Remove Role')
-        .addUserOption(opt =>
-          opt
-            .setName('user')
-            .setDescription('Target user')
-            .setRequired(true)
-        )
-        .addRoleOption(opt =>
-          opt
-            .setName('role')
-            .setDescription('Role')
-            .setRequired(true)
-        )
+        .addUserOption(opt => opt.setName('user').setDescription('Target user').setRequired(true))
+        .addRoleOption(opt => opt.setName('role').setDescription('Role').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles),
 
       async execute(interaction) {
-        const member =
-          interaction.options.getMember('user');
+        const member = interaction.options.getMember('user');
+        const role = interaction.options.getRole('role');
 
-        const role =
-          interaction.options.getRole('role');
-
-        if (!member) {
-          return interaction.reply(
-            textReply('❌ Member not found.', true)
-          );
-        }
-
-        if (!role) {
-          return interaction.reply(
-            textReply('❌ Role not found.', true)
-          );
-        }
-
-        if (!role.editable) {
-          return interaction.reply(
-            textReply('❌ I cannot manage this role.', true)
-          );
-        }
+        if (!member || !role) return interaction.reply(textReply('❌ Invalid user or role.', true));
 
         try {
           await member.roles.remove(role);
+          await interaction.reply(textReply(`➖ Role ${role.name} removed from ${member.user.tag}.`));
         } catch {
-          return interaction.reply(
-            textReply('❌ I could not remove this role.', true)
-          );
+          await interaction.reply(textReply('❌ Could not remove role.', true));
         }
-
-        await interaction.reply(
-          textReply(`➖ Role ${role.name} has been removed from ${member.user.tag}.`)
-        );
       }
     },
 
@@ -1160,12 +681,7 @@ module.exports = {
       data: new SlashCommandBuilder()
         .setName('user')
         .setDescription('View User Profile & ID')
-        .addUserOption(opt =>
-          opt
-            .setName('target')
-            .setDescription('Target user to inspect')
-            .setRequired(false)
-        ),
+        .addUserOption(opt => opt.setName('target').setDescription('Target user').setRequired(false)),
 
       async execute(interaction) {
         const targetUser = interaction.options.getUser('target') || interaction.user;
@@ -1174,219 +690,18 @@ module.exports = {
         const embed = new EmbedBuilder()
           .setTitle(`👤 User Profile: ${targetUser.username}`)
           .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
-          .setColor('#5865f2')
+          .setColor('#2f3136')
           .addFields(
             { name: '🆔 User ID', value: `\`${targetUser.id}\``, inline: true },
-            { name: '🏷️ Tag', value: `\`${targetUser.tag}\``, inline: true },
-            { name: '📅 Account Created', value: `<t:${Math.floor(targetUser.createdTimestamp / 1000)}:R>`, inline: false }
+            { name: '🏷️ Tag', value: `\`${targetUser.tag}\``, inline: true }
           )
-          .setFooter({ text: 'Oscorp Control Systems' })
-          .setTimestamp();
+          .setFooter({ text: 'Oscorp Control Systems' });
 
         if (member) {
-          embed.addFields(
-            { name: '📥 Joined Server', value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>`, inline: true },
-            { name: '🎭 Roles', value: member.roles.cache.map(r => r.toString()).join(', ') || 'None', inline: false }
-          );
+          embed.addFields({ name: '🎭 Roles', value: member.roles.cache.map(r => r.toString()).join(', ') || 'None', inline: false });
         }
 
         await interaction.reply({ embeds: [embed], ephemeral: true });
-      }
-    },
-
-    // 23. HELP DOCUMENTATION (DM + Reaction + Auto-Delete 3s)
-    {
-      data: new SlashCommandBuilder()
-        .setName('help')
-        .setDescription('Display Documentation in DMs'),
-
-      async execute(interaction) {
-        const mainEmbed = new EmbedBuilder()
-          .setTitle('🛡️ Moderation & Security Suite')
-          .setDescription(
-            '• </ban:0> - 🔨 Ban User\n' +
-            '• </unban:0> - 🔓 Unban User by ID\n' +
-            '• </kick:0> - 👢 Kick User\n' +
-            '• </timeout:0> - 🔇 Timeout/Mute Member\n' +
-            '• </untimeout:0> - 🔊 Remove Timeout\n' +
-            '• </warn:0> - ⚠️ Issue Warning\n' +
-            '• </clear:0> - 🧹 Purge Messages\n' +
-            '• </role-add:0> - ➕ Assign Role\n' +
-            '• </role-remove:0> - ➖ Remove Role\n' +
-            '• </vkick:0> - 🎙️ Kick from Voice\n' +
-            '• </vmove:0> - ↗️ Move Voice Member\n' +
-            '• </vmute:0> - 🎙️ Mute in Voice\n' +
-            '• </vunmute:0> - 🔊 Unmute in Voice\n' +
-            '• </vdeaf:0> - 🎧 Deafen in Voice\n' +
-            '• </vundeaf:0> - 🎵 Undeafen in Voice'
-          )
-          .setColor('#2f3136')
-          .setFooter({ text: 'Oscorp Control Systems' });
-
-        const selectMenu = new ActionRowBuilder().addComponents(
-          new StringSelectMenuBuilder()
-            .setCustomId('help_category_select')
-            .setPlaceholder('اختر قسم الأوامر من القائمة المنسدلة لعرض تفاصيل الأوامر.')
-            .addOptions([
-              {
-                label: 'Moderation Suite',
-                value: 'help_mod',
-                emoji: '🛡️'
-              },
-              {
-                label: 'Channel Controls',
-                value: 'help_channel',
-                emoji: '🔒'
-              },
-              {
-                label: 'Utility & Profile',
-                value: 'help_utility',
-                emoji: '⚙️'
-              }
-            ])
-        );
-
-        try {
-          await interaction.user.send({
-            content: 'اختر قسم الأوامر من القائمة المنسدلة لعرض تفاصيل الأوامر.\n\nOscorp Security Systems',
-            embeds: [mainEmbed],
-            components: [selectMenu]
-          });
-
-          const replyMessage = await interaction.reply({
-            content: '✅ تم إرسال قائمة الأوامر إلى رسائلك الخاصة!',
-            ephemeral: true
-          });
-
-          await replyMessage.react('✅').catch(() => null);
-
-          // حذف رد البوت تلقائياً في السيرفر بعد 3 ثوانٍ
-          setTimeout(() => {
-            interaction.deleteReply().catch(() => null);
-          }, 3000);
-
-        } catch (error) {
-          const failMsg = await interaction.reply({
-            content: '❌ لم أستطع إرسال الرسالة في الخاص! يرجى فتح الرسائل الخاصة (DMs) الخاصة بك أولاً.',
-            ephemeral: true
-          });
-
-          setTimeout(() => {
-            interaction.deleteReply().catch(() => null);
-          }, 3000);
-        }
-      }
-    },
-
-    // 24. GET EMOJI ID
-    {
-      data: new SlashCommandBuilder()
-        .setName('get-emoji')
-        .setDescription('Get the ID and code format of any server emoji')
-        .addStringOption(opt =>
-          opt
-            .setName('emoji')
-            .setDescription('Type or select the emoji')
-            .setRequired(true)
-        ),
-
-      async execute(interaction) {
-        const input = interaction.options.getString('emoji');
-        const match = input.match(/<a?:(\w+):(\d+)>/);
-
-        if (!match) {
-          const guildEmoji = interaction.guild.emojis.cache.find(
-            e => e.name === input.replace(/:/g, '')
-          );
-
-          if (guildEmoji) {
-            const format = guildEmoji.animated 
-              ? `<a:${guildEmoji.name}:${guildEmoji.id}>` 
-              : `<:${guildEmoji.name}:${guildEmoji.id}>`;
-
-            return interaction.reply(
-              textReply(
-                `🆔 **Emoji ID:** \`${guildEmoji.id}\`\n` +
-                `✨ **Format:** \`${format}\`\n` +
-                `📌 **Preview:** ${format}`,
-                true
-              )
-            );
-          }
-
-          return interaction.reply(
-            textReply('❌ Could not find this emoji. Make sure to send/paste the emoji directly.', true)
-          );
-        }
-
-        const emojiName = match[1];
-        const emojiId = match[2];
-        const isAnimated = input.startsWith('<a:');
-        const format = isAnimated ? `<a:${emojiName}:${emojiId}>` : `<:${emojiName}:${emojiId}>`;
-
-        await interaction.reply(
-          textReply(
-            `🆔 **Emoji ID:** \`${emojiId}\`\n` +
-            `✨ **Format:** \`${format}\`\n` +
-            `📌 **Preview:** ${format}`,
-            true
-          )
-        );
-      }
-    },
-
-    // 25. FETCH & CLONE EMOJIS
-    {
-      data: new SlashCommandBuilder()
-        .setName('fetch-emojis')
-        .setDescription('Fetch all custom emojis from a target server and add them to THIS server')
-        .addStringOption(opt =>
-          opt
-            .setName('server_id')
-            .setDescription('Target Server ID (Guild ID)')
-            .setRequired(true)
-        )
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuildExpressions),
-
-      async execute(interaction) {
-        await interaction.deferReply({ ephemeral: true });
-
-        const guildId = interaction.options.getString('server_id');
-        const targetGuild = interaction.client.guilds.cache.get(guildId);
-
-        if (!targetGuild) {
-          return interaction.editReply('❌ The bot is not in that target server or the Server ID is invalid.');
-        }
-
-        const emojis = await targetGuild.emojis.fetch().catch(() => null);
-
-        if (!emojis || emojis.size === 0) {
-          return interaction.editReply('❌ No custom emojis found in the target server.');
-        }
-
-        await interaction.editReply(`🔄 Starting to copy ${emojis.size} emojis from **${targetGuild.name}** to this server... Please wait.`);
-
-        let addedCount = 0;
-        let failedCount = 0;
-
-        for (const emoji of emojis.values()) {
-          try {
-            await interaction.guild.emojis.create({
-              attachment: emoji.url,
-              name: emoji.name
-            });
-            addedCount++;
-          } catch (err) {
-            console.error(`Failed to add emoji ${emoji.name}:`, err.message);
-            failedCount++;
-          }
-        }
-
-        await interaction.editReply(
-          `✅ **Emoji Cloning Complete!**\n\n` +
-          `• 📥 **Successfully Added:** \`${addedCount}\` emojis\n` +
-          `• ❌ **Failed/Skipped:** \`${failedCount}\` (e.g. server slots full or name conflict)`
-        );
       }
     }
 
