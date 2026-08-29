@@ -149,7 +149,7 @@ module.exports = {
 
   commands: [
 
-    // 1. HELP COMMAND (ProBot Style: Feeling lost?)
+    // 1. HELP COMMAND (Feeling lost? + Option command)
     {
       data: new SlashCommandBuilder()
         .setName('help')
@@ -157,7 +157,7 @@ module.exports = {
         .addStringOption(opt =>
           opt
             .setName('command')
-            .setDescription('Shows details about how to use a command.')
+            .setDescription('Show details about a specific command.')
             .setRequired(false)
             .setAutocomplete(true)
         ),
@@ -165,7 +165,7 @@ module.exports = {
       async execute(interaction) {
         const cmdName = interaction.options.getString('command');
 
-        // إذا أرسل المستخدم /help بدون تحديد أمر
+        // في حال تم كتابة الأمر بدون اختيار اسم أمر معين
         if (!cmdName) {
           const listEmbed = new EmbedBuilder()
             .setTitle('📖 Oscorp Control Systems - Help')
@@ -174,7 +174,7 @@ module.exports = {
               name: '🛠️ Available Commands',
               value: '`ban`, `unban`, `kick`, `timeout`, `untimeout`, `warn`, `clear`, `lock`, `unlock`, `hide`, `unhide`, `slowmode`, `vkick`, `vmove`, `vmute`, `vunmute`, `vdeaf`, `vundeaf`, `role-add`, `role-remove`, `user`'
             })
-            .setColor('#2f3136')
+            .setColor('#2b2d31') // شريط لون رصاصي
             .setFooter({ text: 'Oscorp Control Systems' });
 
           return interaction.reply({ embeds: [listEmbed], ephemeral: true });
@@ -187,7 +187,7 @@ module.exports = {
           return interaction.reply(textReply(`❌ Command \`${cleanCmdName}\` not found in help database.`, true));
         }
 
-        // عرض التفاصيل تماماً مثل ProBot
+        // إمبد رصاصي تفصيلي للأمر بنفس أسلوب ProBot
         const helpEmbed = new EmbedBuilder()
           .setTitle(`Command: ${cleanCmdName}`)
           .setDescription(data.description)
@@ -195,7 +195,7 @@ module.exports = {
             { name: 'Usage:', value: `\`\`\`text\n${data.usage}\n\`\`\``, inline: false },
             { name: 'Examples:', value: `\`\`\`text\n${data.examples.join('\n')}\n\`\`\``, inline: false }
           )
-          .setColor('#2f3136')
+          .setColor('#2b2d31') // شريط لون رصاصي
           .setFooter({ text: 'Oscorp Control Systems' });
 
         await interaction.reply({ embeds: [helpEmbed], ephemeral: true });
@@ -296,7 +296,7 @@ module.exports = {
 
         try {
           await member.kick(reason);
-          await interaction.reply(textReply(`` + member.user.tag + ` has been kicked.`));
+          await interaction.reply(textReply(`${member.user.tag} has been kicked.`));
         } catch {
           await interaction.reply(textReply('❌ I could not kick this member.', true));
         }
@@ -646,7 +646,7 @@ module.exports = {
         const embed = new EmbedBuilder()
           .setTitle(`👤 User Profile: ${targetUser.username}`)
           .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
-          .setColor('#2f3136')
+          .setColor('#2b2d31')
           .addFields(
             { name: '🆔 User ID', value: `\`${targetUser.id}\``, inline: true },
             { name: '🏷️ Tag', value: `\`${targetUser.tag}\``, inline: true }

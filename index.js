@@ -22,7 +22,7 @@ client.once('ready', () => {
 });
 
 client.on('interactionCreate', async (interaction) => {
-  // 1. Autocomplete Handler (لإظهار قائمة الأوامر المتاحة تلقائياً أثناء الكتابة)
+  // Autocomplete لإظهار اسم الكوماند المتاح فوراً عند كتابة /help command:
   if (interaction.isAutocomplete()) {
     if (interaction.commandName === 'help') {
       const focusedValue = interaction.options.getFocused().toLowerCase();
@@ -40,7 +40,7 @@ client.on('interactionCreate', async (interaction) => {
     return;
   }
 
-  // 2. Slash Commands Handler
+  // تنفيذ الأوامر (Slash Commands)
   if (interaction.isChatInputCommand()) {
     const command = client.commands.get(interaction.commandName);
     if (!command) return;
