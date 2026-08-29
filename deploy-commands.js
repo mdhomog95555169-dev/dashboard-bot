@@ -1,38 +1,39 @@
 require('dotenv').config();
-const { REST, Routes, SlashCommandBuilder } = require('discord.js');
-const { commands } = require('./commands');
+const { REST, Routes } = require('discord.js');
+const { commands } = require('./commands.js');
 
-function buildOption(builder, opt) {
-  const setup = (o) => o.setName(opt.name).setDescription(opt.description || opt.name).setRequired(!!opt.required);
-  switch (opt.type) {
-    case 'user': return builder.addUserOption(setup);
-    case 'role': return builder.addRoleOption(setup);
-    case 'channel': return builder.addChannelOption(setup);
-    case 'integer': return builder.addIntegerOption(setup);
-    default: return builder.addStringOption(setup);
-  }
+// محاولة جلب التوكن بأي اسم ممكن أو من ملف config.json إن وجد
+let token = process.env.TOKEN || process.env.DISCORD_TOKEN || process.env.BOT_TOKEN;
+
+if (!token) {
+  try {
+    const config = require('./config.json');
+    token = config.token;
+  } catch (e) {}
 }
 
-const body = commands.map((cmd) => {
-  const builder = new SlashCommandBuilder().setName(cmd.name).setDescription(cmd.description);
-  for (const opt of cmd.options || []) buildOption(builder, opt);
-  return builder.toJSON();
-});
+if (!token) {
+  console.error('❌ لم يتم العثور على TOKEN. يرجى التأكد من وجود التوكن في ملف .env أو التشغيل مباشرة باستخدامه.');
+  process.exit(1);
+}
 
-const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+const rest = new REST({ version: '10' }).setToken(token);
 
 (async () => {
   try {
-    const clientId = process.env.CLIENT_ID;
-    const guildId = process.env.GUILD_ID;
-    if (guildId) {
-      await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body });
-      console.log(`✅ تم تسجيل ${body.length} أمر Slash على السيرفر (${guildId}).`);
-    } else {
-      await rest.put(Routes.applicationCommands(clientId), { body });
-      console.log(`✅ تم تسجيل ${body.length} أمر Slash عالمياً.`);
-    }
-  } catch (err) {
-    console.error(err);
+    console.log('🔄 جاري الاتصال بديسكورد وتحديد معرف البوت...');
+    const user = await rest.get(Routes.user());
+    const appId = user.id;
+
+    console.log('🧹 جاري مسح كافة الأوامر القديمة لتحديث الوصف...');
+    await rest.put(Routes.applicationCommands(appId), { body: [] });
+
+    console.log('🚀 جاري تسجيل الأوامر الجديدة بالوصف والخيارات المحدثة...');
+    const bodyData = commands.map(cmd => cmd.data.toJSON());
+    await rest.put(Routes.applicationCommands(appId), { body: bodyData });
+
+    console.log('✅ تم تحديث ونشر جميع أوامر السلاش بنجاح بنسبة 100%!');
+  } catch (error) {
+    console.error('❌ خطأ أثناء رفع الأوامر:', error);
   }
 })();
