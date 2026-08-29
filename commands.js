@@ -302,7 +302,7 @@ module.exports = {
 
         setTimeout(() => {
           interaction.deleteReply().catch(() => null);
-        }, 5000);
+        }, 3000);
       }
     },
 
@@ -1194,7 +1194,7 @@ module.exports = {
       }
     },
 
-    // 23. HELP DOCUMENTATION (DM + Reaction)
+    // 23. HELP DOCUMENTATION (DM + Reaction + Auto-Delete 3s)
     {
       data: new SlashCommandBuilder()
         .setName('help')
@@ -1255,16 +1255,25 @@ module.exports = {
 
           const replyMessage = await interaction.reply({
             content: '✅ تم إرسال قائمة الأوامر إلى رسائلك الخاصة!',
-            fetchReply: true
+            ephemeral: true
           });
 
           await replyMessage.react('✅').catch(() => null);
 
+          // حذف رد البوت تلقائياً في السيرفر بعد 3 ثوانٍ
+          setTimeout(() => {
+            interaction.deleteReply().catch(() => null);
+          }, 3000);
+
         } catch (error) {
-          await interaction.reply({
+          const failMsg = await interaction.reply({
             content: '❌ لم أستطع إرسال الرسالة في الخاص! يرجى فتح الرسائل الخاصة (DMs) الخاصة بك أولاً.',
             ephemeral: true
           });
+
+          setTimeout(() => {
+            interaction.deleteReply().catch(() => null);
+          }, 3000);
         }
       }
     },
