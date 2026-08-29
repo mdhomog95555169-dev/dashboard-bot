@@ -3,18 +3,10 @@ const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('help')
-    .setDescription('Feeling lost?')
-    .addStringOption(option =>
-      option
-        .setName('command')
-        .setDescription('اسم الأمر للحصول على شرح')
-        .setRequired(false)
-    ),
+    .setDescription('Feeling lost?'),
 
   async execute(interaction) {
-    const commandName = interaction.options.getString('command');
-
-    // الإمبد الرئيسي الشامل والنظيف
+    // إمبد واحد بسيط ونظيف بدون إمبد داخلي وبدون DMs
     const mainEmbed = new EmbedBuilder()
       .setColor('#2b2d31')
       .setTitle('🛡️ Oscorp Control Systems - Help')
@@ -23,10 +15,10 @@ module.exports = {
       )
       .setFooter({ text: 'Oscorp Control Systems' });
 
-    // الرد في نفس الروم بدون إرسال أي شيء في الخاص
+    // الرد المباشر في الشات دون إرسال أي شيء في الخاص
     return interaction.reply({
       embeds: [mainEmbed],
-      ephemeral: true // مخفي للمستخدم في نفس الروم وبدون DMs
+      ephemeral: true
     });
   }
 };
