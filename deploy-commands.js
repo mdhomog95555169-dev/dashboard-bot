@@ -1,39 +1,35 @@
-require('dotenv').config();
+const fs = require('fs');
 const { REST, Routes } = require('discord.js');
 const { commands } = require('./commands.js');
 
-// محاولة جلب التوكن بأي اسم ممكن أو من ملف config.json إن وجد
-let token = process.env.TOKEN || process.env.DISCORD_TOKEN || process.env.BOT_TOKEN;
+// 1. جلب التوكن من بيئة التشغيل أو من index.js تلقائياً
+let token = process.env.TOKEN || process.env.DISCORD_TOKEN;
 
 if (!token) {
   try {
-    const config = require('./config.json');
-    token = config.token;
+    const indexContent = fs.readFileSync('./index.js', 'utf8');
+    const match = indexContent.match(/['"]([A-Za-z0-9_\-]{24,28}\.[A-Za-z0-9_\-]{6}\.[A-Za-z0-9_\-]{27,38})['"]/);
+    if (match) token = match[1];
   } catch (e) {}
 }
 
 if (!token) {
-  console.error('❌ لم يتم العثور على TOKEN. يرجى التأكد من وجود التوكن في ملف .env أو التشغيل مباشرة باستخدامه.');
-  process.exit(1);
+  console.error('❌ تعذر العثور على التوكن. سنقوم برفع الأوامر باستخدام التوكن الممرر.');
 }
 
 const rest = new REST({ version: '10' }).setToken(token);
 
 (async () => {
   try {
-    console.log('🔄 جاري الاتصال بديسكورد وتحديد معرف البوت...');
+    console.log('🔄 جاري جلب معرّف البوت وتحديث أوامر السلاش...');
     const user = await rest.get(Routes.user());
-    const appId = user.id;
-
-    console.log('🧹 جاري مسح كافة الأوامر القديمة لتحديث الوصف...');
-    await rest.put(Routes.applicationCommands(appId), { body: [] });
-
-    console.log('🚀 جاري تسجيل الأوامر الجديدة بالوصف والخيارات المحدثة...');
+    
+    console.log('🚀 جاري رفع الأوامر إلى ديسكورد...');
     const bodyData = commands.map(cmd => cmd.data.toJSON());
-    await rest.put(Routes.applicationCommands(appId), { body: bodyData });
+    await rest.put(Routes.applicationCommands(user.id), { body: bodyData });
 
-    console.log('✅ تم تحديث ونشر جميع أوامر السلاش بنجاح بنسبة 100%!');
+    console.log('✅ تم رفع وتحديث جميع الأوامر بنجاح 100%!');
   } catch (error) {
-    console.error('❌ خطأ أثناء رفع الأوامر:', error);
+    console.error('❌ خطأ أثناء رفع الأوامر:', error.message);
   }
 })();
